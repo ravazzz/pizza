@@ -219,14 +219,14 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
     const room=num(inp.room,16),flT=num(inp.flourT,room),tgt=num(inp.target,21),fric=num(inp.fric,mx.fric);
     const fr=num(inp.fridge,4),r2=num(inp.room2,18),pT=num(inp.proofT,24);
     /* giorno del forno: più freddo = più tempo (circa il doppio ogni 8 °C) */
-    const outMin=Math.round(clamp(150*Math.pow(2,(20-r2)/8),60,360)/5)*5;
+    const outMin=inp.outH!=null&&inp.outH!==''&&+inp.outH>0?Math.round(+inp.outH*60):Math.round(clamp(150*Math.pow(2,(20-r2)/8),60,360)/5)*5;
     const proofMin=Math.round(clamp(P.proof*Math.pow(2,(24-pT)/8),20,240)/5)*5;
     const bake=new Date(inp.bake).getTime();
     const durSum=mixSteps(inp.mixer).reduce((a,s)=>a+s.dur,0)+(N-1)*mx.work;
     const fiPred=t0+durSum*60000,out=bake-(proofMin+15+outMin)*60000,hoursY=(out-fiPred)/3600000;
-    /* lievito: base 0,07% per 48 h a 4 °C con impasto a 21 °C */
-    const base=hoursY>0?0.07*Math.pow(48/Math.max(hoursY,1),1.1):0.4;
-    const yPct=clamp(base/Math.pow(2,(fr-4)/7)/Math.pow(2,(tgt-21)/10),0.02,0.4);
+    /* lievito fresco: base 0,25% per 48 h a 4 °C con impasto a 21 °C, in linea con le dosi d'uso per la teglia a freddo */
+    const base=hoursY>0?0.25*Math.pow(48/Math.max(hoursY,1),1.1):1;
+    const yPct=clamp(base/Math.pow(2,(fr-4)/7)/Math.pow(2,(tgt-21)/10),0.08,1);
     const fl=total/(1+idr+0.025+P.olio/100+yPct/100),ac=fl*idr;
     /* acqua: bilancio di calore di farina, acqua e vasca, poi calore dell'impastatrice e scambio con la sala */
     const kgB=total/N/1000,k=clamp(0.4/Math.sqrt(kgB),0.06,0.25);
@@ -265,7 +265,7 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
     const day=(t,lim)=>{const d=new Date(t),h=d.getHours();if(h>=8&&h<22)return t;const m=new Date(d.getFullYear(),d.getMonth(),d.getDate()+(h>=22?1:0),8,0,0).getTime();return m<lim-3600000?m:t};
     const fr=r.nChk>1?[0.35,0.7]:[0.5];
     fr.forEach((f,i)=>W('chk'+(i+1),'frigo','Controllo in frigo'+(r.nChk>1?' '+(i+1):''),'Guarda le vaschette senza toccare l\'impasto.',day(fi+f*(out-fi),out),{note:'Più che raddoppiato: sposta nel punto più freddo del frigo. Quasi uguale a quando l\'hai messo: è normale, riparte quando esce dal frigo.'}));
-    W('out','forno','Fuori dal frigo','Togli le vaschette e lasciale coperte nel locale a '+t1(r.r2)+' °C.',out,{note:'A '+t1(r.r2)+' °C servono circa '+hmin(r.outMin)+' prima di stendere. A 20 °C ne basterebbero 2 h 30 min.'});
+    W('out','forno','Fuori dal frigo','Togli le vaschette e lasciale coperte nel locale a '+t1(r.r2)+' °C.',out,{note:'Resta fuori '+hmin(r.outMin)+' prima di stendere. È pronto quando è circa raddoppiato rispetto a quando l\'hai messo in frigo: se non lo è, aspetta ancora.'});
     W('stendi','forno','Taglia e stendi','Rovescia l\'impasto sul piano infarinato senza sgonfiarlo. Taglia pezzi da circa '+gr(r.g)+', ungi bene la teglia e stendi con i polpastrelli dal centro verso i bordi.',stendi,{anim:'stretch',note:'Se l\'impasto si ritira, lascialo riposare 10 minuti e riprendi. Non usare il mattarello: schiaccia gli alveoli.'});
     X.push({id:'proof',phase:'forno',h:'Lievitazione in teglia',p:r.proofMin+' minuti a '+t1(r.pT)+' °C, teglie coperte. Accendi il forno al massimo (250-270 °C) circa 30 minuti prima di infornare.',dur:r.proofMin,timer:true,anim:'poke',plan:stendi+10*ms,note:'Pronta quando è gonfia e l\'impronta del dito torna su piano piano.'});
     X.push({id:'inforna',phase:'forno',h:'Condisci e inforna',p:'Condisci e inforna alla massima temperatura. Se la base cuoce piano, teglia sul livello più basso.',dur:0,timer:false,plan:r.bake});
@@ -609,6 +609,7 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
       h+='<h3 class="grp">Giorno del forno</h3><label>Ora di infornata<input type="datetime-local" data-sk="bake" value="'+i.bake+'"></label><div class="grid">'+
         '<label>Dove si acclimata (°C)<input type="number" data-sk="room2" step="0.5" inputmode="decimal" value="'+i.room2+'"></label>'+
         '<label>Dove lievitano le teglie (°C)<input type="number" data-sk="proofT" step="0.5" inputmode="decimal" value="'+i.proofT+'"></label></div>'+
+        '<label>Ore fuori dal frigo prima di stendere<input type="number" data-sk="outH" min="1" max="24" step="0.5" inputmode="decimal" value="'+(i.outH||'')+'" placeholder="'+t1(r.outMin/60)+' (calcolate)"></label>'+
         '<p class="sub">Cambiando questi valori si spostano gli orari di uscita dal frigo, stesura e forno. Le dosi restano quelle già pesate.</p>'+
         '<h3 class="grp">Avvisi</h3><p class="sub">'+notifText()+'</p>'+
         (('Notification' in window)&&Notification.permission==='default'?'<button type="button" class="btn ghost small" data-act="notif">Attiva notifiche</button>':'')+
