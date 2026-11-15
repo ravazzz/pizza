@@ -411,7 +411,8 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
     var outMin=Math.round(clamp(150*Math.pow(2,(20-r2)/8),60,360)/5)*5;
     var proofMin=Math.round(clamp(st.proof*Math.pow(2,(24-pT)/8),20,240)/5)*5;
     var start=new Date(S.start),bake=new Date(S.bake);
-    var fi=new Date(start.getTime()+(mx.end+(N-1)*mx.work)*60000);
+    var foldMin=S.mixer==='mano'?0:20;
+    var fi=new Date(start.getTime()+(mx.end+foldMin+(N-1)*mx.work)*60000);
     var out=new Date(bake.getTime()-(proofMin+15+outMin)*60000);
     var hours=(out-fi)/3600000;
     /* lievito: base 0,07% per 48 h a 4 °C con impasto a 21 °C */
@@ -431,7 +432,7 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
     return {st:st,mx:mx,n:n,g:g,idr:idr,total:total,capG:capG,N:N,start:start,bake:bake,fi:fi,out:out,hours:hours,
             yPct:yPct,fl:fl,ac:ac,sa:fl*0.025,ol:fl*st.olio/100,lv:fl*yPct/100,
             room:room,flT:flT,tgt:tgt,fric:fric,fr:fr,r2:r2,pT:pT,outMin:outMin,proofMin:proofMin,
-            k:k,Tafter:Tafter,Tmix:Tmix,Tw:Tw,Tres:Tres,Tmain:Tmain};
+            foldMin:foldMin,k:k,Tafter:Tafter,Tmix:Tmix,Tw:Tw,Tres:Tres,Tmain:Tmain};
   }
 
   function buildSteps(r){
@@ -445,8 +446,9 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
     if(N>1)add('impasto',r.start,{h:'Lotti',p:'Servono '+N+' lotti da circa '+(r.total/N/1000).toFixed(1).replace('.',',')+' kg di impasto. Ripeti i passaggi per ogni lotto e metti ciascun lotto in frigo appena è pronto.'});
     r.mx.steps(c).forEach(function(s){add('impasto',new Date(r.start.getTime()+s.t*ms),s)});
     var vasch=Math.max(1,Math.ceil(r.total/6000));
-    add('impasto',r.fi,{h:'In contenitore e in frigo',p:'Ungi circa '+vasch+(vasch>1?' vaschette':' vaschetta')+' larghe e basse (tipo GN 1/1) e riempile fino a 5-6 cm di altezza: l\'impasto deve poter raddoppiare. Copri senza sigillare e metti in frigo ('+t1(r.fr)+' °C).'});
-    if(r.hours>20)add('frigo',new Date(r.fi.getTime()+120*ms),{h:'Piega di rinforzo',p:'Tira i lembi dall\'esterno verso il centro nel contenitore, con delicatezza.',note:'Aiuta il raffreddamento e rinforza l\'impasto. Con un carico basso in impastatrice è più utile.'});
+    if(r.foldMin)add('impasto',new Date(r.fi.getTime()-r.foldMin*ms),{h:'In vaschetta e pieghe',p:'Dividi l\'impasto nelle vaschette. Con le mani bagnate tira un lembo verso l\'alto e ripiegalo sul centro, gira la vaschetta di un quarto e ripeti: 4 pieghe per giro, 2 giri.',note:'Se la superficie resta grezza o strappata, ripeti dopo 15 minuti. Deve diventare una pagnotta liscia e bombata.',timer:900});
+    add('impasto',r.fi,{h:'Olio, copri e in frigo',p:'Usa circa '+vasch+(vasch>1?' vaschette':' vaschetta')+' (tipo GN 1/1), con l\'impasto alto 5-6 cm: deve poter raddoppiare. Ungi la superficie e i bordi con un filo d\'olio, copri bene con coperchio o pellicola e metti in frigo ('+t1(r.fr)+' °C).'});
+    if(r.hours>20)add('frigo',new Date(r.fi.getTime()+120*ms),{h:'Piega di rinforzo (facoltativa)',p:'Tira i lembi dall\'esterno verso il centro nel contenitore, con delicatezza.',note:'Aiuta il raffreddamento e rinforza l\'impasto. Con un carico basso in impastatrice è più utile.'});
     if(r.hours>0){
       var cs=r.hours>36?[0.35,0.7]:[0.5];
       cs.forEach(function(f,i){add('frigo',new Date(r.fi.getTime()+f*r.hours*3600000),{h:'Controllo '+(i+1),p:'Guarda i contenitori.',note:'Più che raddoppiato: sposta nel punto più freddo del frigo. Quasi uguale a quando l\'hai messo: è normale, riparte quando esce dal frigo.'})});
