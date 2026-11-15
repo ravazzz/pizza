@@ -686,7 +686,7 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
     if(!list.length){panel.innerHTML='<p class="msg">Nessun passaggio in questa fase.</p>';return}
     list.forEach(function(s,i){
       var key=s.phase+':'+s.h;
-      var wrap=document.createElement('div');wrap.className='step'+(done[key]?' done':'')+(!nextMarked&&!done[key]&&s.time.getTime()>Date.now()-60000?(nextMarked=true,' next'):'');
+      var wrap=document.createElement('div');wrap.className='step'+(done[key]?' done':'')+((S.started?stepId(s)===curId:(!nextMarked&&!done[key]&&s.time.getTime()>Date.now()-60000))&&!nextMarked?(nextMarked=true,' next'):'');
       var cb=document.createElement('input');cb.type='checkbox';cb.checked=!!done[key];
       cb.setAttribute('aria-labelledby','sh-'+i);
       cb.addEventListener('change',function(){
@@ -711,7 +711,7 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
   /* ---- Copertina e prossimo passaggio ---- */
   var lastR=null;
   function renderHero(r){
-    lastR=r;
+    lastR=r;boxSig='';
     var tm=Math.round(clamp(r.Tmain,0,60));
     $('stats').innerHTML=
       '<div class="stat"><b>'+(r.total/1000).toFixed(1).replace('.',',')+'</b><span>kg di impasto</span></div>'+
@@ -720,62 +720,87 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
       '<div class="stat"><b>'+pad(r.bake.getHours())+':'+pad(r.bake.getMinutes())+'</b><span>'+r.bake.toLocaleDateString('it-IT',{weekday:'long'})+' in forno</span></div>';
     tickNow();
   }
-  function progress(){
-    var r=lastR;if(!r)return;
-    var all=buildSteps(r),n=0;
-    all.forEach(function(st){if(done[st.phase+':'+st.h])n++});
+  var curId='',boxSig='';
+  function stepId(st){return st.phase+':'+st.h+'@'+st.time.getTime()}
+  function progress(all,now){
+    var n=0;
+    all.forEach(function(st){if(done[st.phase+':'+st.h]||(S.started&&st.time.getTime()<=now))n++});
     var pc=all.length?Math.round(n/all.length*100):0;
     $('progfill').style.width=pc+'%';
-    $('progtxt').textContent=n+' di '+all.length+' · '+pc+'%';
+    $('progtxt').textContent='Passaggio '+Math.min(n,all.length)+' di '+all.length+' · '+pc+'%';
     $('prog').setAttribute('aria-valuenow',pc);
     $('prog').classList.toggle('full',pc===100);
+  }
+  function left(ms){
+    var s=Math.max(0,Math.round(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s%3600/60);
+    return h?h+' h '+pad(m)+' min':pad(m)+':'+pad(s%60);
   }
   function tickNow(){
     var r=lastR,box=$('now');if(!r||isNaN(r.start)||r.bake<=r.start){box.style.display='none';return}
     box.style.display='';
-    progress();
-    var all=buildSteps(r),now=Date.now(),nx=null,i,h='';
+    var all=buildSteps(r),now=Date.now(),i,ci=-1;
+    progress(all,now);
+    for(i=0;i<all.length;i++)if(all[i].time.getTime()<=now)ci=i;
+    var cur=S.started&&ci>=0?all[ci]:null,nxt=all[ci+1]||null;
+    /* notifiche dei passaggi */
     if(S.started){
       for(i=0;i<all.length;i++){
-        var st=all[i],k=st.phase+':'+st.h+'@'+st.time.getTime(),tt=st.time.getTime();
-        if(tt<=now&&now-tt<5*60000&&!notified[k]&&!done[st.phase+':'+st.h]){notified[k]=1;store.set('pizza-notified',JSON.stringify(notified));notify('Ora: '+st.h,st.p.replace(/<[^>]+>/g,''))}
+        var st=all[i],k=stepId(st),tt=st.time.getTime();
+        if(tt<=now&&now-tt<5*60000&&!notified[k]){notified[k]=1;store.set('pizza-notified',JSON.stringify(notified));notify('Ora: '+st.h,st.p.replace(/<[^>]+>/g,''))}
       }
     }
-    for(i=0;i<all.length;i++){if(!done[all[i].phase+':'+all[i].h]&&all[i].time.getTime()>now-10*60000){nx=all[i];break}}
-    if(!S.started){
-      h+='<div class="lbl">Pronto a impastare?</div><h3>Quando inizi a pesare, premi qui</h3>'+
-         '<p>Il piano si sposta sull\'ora reale e le dosi del lievito si ricalcolano. Il forno resta '+fmtT(r.bake)+'.</p>'+
-         '<button type="button" class="btn go" data-act="start">Inizia la preparazione adesso</button>';
-    }else if(!nx){
-      h+='<div class="lbl">Fatto</div><h3>Buona pizza!</h3>';
-    }else{
-      var ms=nx.time.getTime()-now,txt;
-      if(ms<=60000)txt='Adesso';
-      else{var m=Math.round(ms/60000),hh=Math.floor(m/60);txt='tra '+(hh?hh+' h '+pad(m%60)+' min':m+' min')}
-      h+='<div class="lbl">Prossimo passaggio · '+fmtT(nx.time)+'</div><div class="cd">'+txt+'</div><h3>'+nx.h+'</h3><p>'+nx.p+'</p>'+
-         '<p class="nstat">Preparazione iniziata '+fmtT(new Date(S.started))+'.</p>';
+    var sigNow=(S.started?'s':'n')+'|'+(cur?stepId(cur):'')+'|'+(nxt?stepId(nxt):'');
+    var newCur=cur?stepId(cur):'';
+    if(newCur!==curId){curId=newCur;renderPlan(r)}
+    if(sigNow!==boxSig){
+      boxSig=sigNow;
+      var h='';
+      if(!S.started){
+        h+='<div class="lbl">Pronto a impastare?</div><h3>Quando inizi a pesare, premi qui</h3>'+
+           '<p>Il piano si sposta sull\'ora reale e le dosi del lievito si ricalcolano. Il forno resta '+fmtT(r.bake)+'.</p>'+
+           '<button type="button" class="btn go" data-act="start">Inizia la preparazione adesso</button>';
+      }else{
+        if(cur){
+          h+='<div class="lbl">Adesso · dalle '+pad(cur.time.getHours())+':'+pad(cur.time.getMinutes())+'</div><h3>'+cur.h+'</h3><p>'+cur.p+'</p>';
+          if(cur.timer){
+            var ck=cur.phase+':'+cur.h;
+            h+='<div class="timer"><button type="button" class="btn" data-act="timer">'+(running[ck]?'Riavvia':'Avvia')+' timer '+Math.round(cur.timer/60)+' min</button><span class="clock" data-key="'+ck.replace(/"/g,'&quot;')+'"></span></div>';
+          }
+        }
+        if(nxt){
+          h+='<div class="lbl" style="margin-top:6px">Poi · '+fmtT(nxt.time)+'</div><div class="cd" id="cd"></div><h3 style="font-size:1.3rem">'+nxt.h+'</h3>';
+        }else{
+          h+='<div class="lbl">Ultimo passaggio</div><h3>Buona pizza!</h3>';
+        }
+      }
+      h+='<div class="actions"><button type="button" class="btn ghost" id="nbtn" data-act="notif">Attiva notifiche</button>'+
+         '<button type="button" class="btn ghost" data-act="ics">Promemoria nel calendario</button></div>'+
+         '<label class="switch" for="awake"><input type="checkbox" id="awake" data-act="awake"'+(awakeOn?' checked':'')+'> Tieni lo schermo acceso durante la preparazione</label>'+
+         '<p class="nstat" id="nstat"></p>';
+      box.innerHTML=h;nstatus();tickTimers();
     }
-    h+='<div class="actions"><button type="button" class="btn ghost" id="nbtn" data-act="notif">Attiva notifiche</button>'+
-       '<button type="button" class="btn ghost" data-act="ics">Promemoria nel calendario</button></div>'+
-       '<label class="switch" for="awake"><input type="checkbox" id="awake" data-act="awake"'+(awakeOn?' checked':'')+'> Tieni lo schermo acceso durante la preparazione</label>'+
-       '<p class="nstat" id="nstat"></p>';
-    box.innerHTML=h;nstatus();
+    var cd=$('cd');
+    if(cd&&nxt)cd.textContent='tra '+left(nxt.time.getTime()-now);
   }
   $('now').addEventListener('click',function(e){
     var a=e.target.getAttribute&&e.target.getAttribute('data-act');
     if(a==='start'){
       var d=new Date();d.setSeconds(0,0);
-      S.start=toInput(d);S.started=d.toISOString();
+      S.start=toInput(d);S.started=d.toISOString();boxSig='';
       done={};running={};saveT();store.set('pizza-done',JSON.stringify({sig:sig,done:done}));
       ensureAudio();askNotif();keepAwake();update();
       window.scrollTo({top:0,behavior:'smooth'});
+    }else if(a==='timer'){
+      var all=buildSteps(lastR),now=Date.now(),c=null;
+      all.forEach(function(st){if(st.time.getTime()<=now)c=st});
+      if(c&&c.timer){startTimer(c.phase+':'+c.h,c.timer,c.h);e.target.textContent='Riavvia timer '+Math.round(c.timer/60)+' min';renderPlan(lastR)}
     }else if(a==='notif')askNotif();
     else if(a==='ics')downloadIcs();
   });
   $('now').addEventListener('change',function(e){
     if(e.target.id==='awake'){awakeOn=e.target.checked;store.set('pizza-awake',awakeOn?'1':'0');if(awakeOn)keepAwake();else releaseAwake()}
   });
-  setInterval(tickNow,30000);
+  setInterval(tickNow,1000);
 
   function drawArt(){
     var c=$('art'),w=c.clientWidth||720,h=c.clientHeight||320,dpr=Math.min(2,window.devicePixelRatio||1);
