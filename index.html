@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pizza in teglia Rebelde</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: una colonna mobile. Tre domande in alto (quanta pizza, impastatrice, quando), poi dosi, regole e piano. */
+:root{
+  --bg:#eef0ea; --card:#ffffff; --ink:#1b2b22; --muted:#5c6b61;
+  --accent:#a8690f; --accent-soft:#f3e3c4; --line:#d6dbd2; --ok:#2f7a4b; --warn:#a2361f;
+  --display:"Bricolage Grotesque","Trebuchet MS",sans-serif;
+  --body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#121a15; --card:#1b2620; --ink:#e8ede7; --muted:#97a69b;
+    --accent:#e0a23f; --accent-soft:#3a2f17; --line:#2d3b32; --ok:#6cc58b; --warn:#f08a70;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121a15; --card:#1b2620; --ink:#e8ede7; --muted:#97a69b;
+  --accent:#e0a23f; --accent-soft:#3a2f17; --line:#2d3b32; --ok:#6cc58b; --warn:#f08a70;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.45}
+main{max-width:720px;margin:0 auto;padding:20px 16px 64px;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0;text-wrap:balance}
+h1{font-size:2rem}
+h2{font-size:1.35rem}
+.sub{color:var(--muted);margin:6px 0 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:14px}
+label{font-size:.9rem;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+input[type=number],input[type=datetime-local],select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;width:100%}
+.inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+fieldset{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+legend{font-size:.9rem;color:var(--muted);padding:0;margin-bottom:6px}
+.chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.chip{position:relative;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:2px;background:var(--bg);color:var(--ink);font-size:1rem}
+.chip input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.chip b{font-weight:600}
+.chip span{font-size:.85rem;color:var(--muted)}
+.chip.on{border-color:var(--accent);background:var(--accent-soft)}
+.chip:focus-within{outline:3px solid var(--accent);outline-offset:2px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{font-size:.8rem;color:var(--muted);font-weight:600;text-align:right;padding:0 4px 6px}
+th:first-child{text-align:left}
+td{padding:9px 4px;border-bottom:1px solid var(--line)}
+td.v{text-align:right;font-weight:600;font-size:1.05rem;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td small{display:block;color:var(--muted);font-weight:400;font-size:.8rem}
+.tot{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.pill{background:var(--accent-soft);border-radius:10px;padding:10px 12px}
+.pill b{display:block;font-family:var(--display);font-size:1.3rem;font-variant-numeric:tabular-nums}
+.pill span{font-size:.82rem;color:var(--muted)}
+.msg{margin:0;padding:10px 12px;border-radius:10px;background:var(--accent-soft)}
+.msg.bad{border:1px solid var(--warn);color:var(--warn);background:transparent}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tab{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 14px;cursor:pointer}
+.tab[aria-selected=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .tab[aria-selected=true]{color:#1b1405}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tab[aria-selected=true]{color:#1b1405}}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.step{display:grid;grid-template-columns:auto 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.step:last-child{border-bottom:0}
+.step input[type=checkbox]{width:26px;height:26px;margin-top:2px;accent-color:var(--ok)}
+.step.done .body{opacity:.5}
+.step.done h3{text-decoration:line-through}
+.when{font-variant-numeric:tabular-nums;font-weight:600;color:var(--accent);font-size:.95rem}
+.step h3{font-size:1.1rem;margin:2px 0 4px}
+.step p{margin:0}
+.step .note{color:var(--muted);font-size:.92rem;margin-top:4px}
+.timer{margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.btn{font:inherit;font-weight:600;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:8px;padding:6px 12px;cursor:pointer}
+.btn:hover{background:var(--accent-soft)}
+.clock{font-variant-numeric:tabular-nums;font-weight:600;font-size:1.15rem}
+.clock.ring{color:var(--ok)}
+ul.rules{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+.reset{align-self:flex-start}
+.row{display:flex;gap:8px;align-items:flex-end}
+.row label{flex:1}
+@media (prefers-reduced-motion:no-preference){.clock.ring{animation:pulse 1s infinite}}
+@keyframes pulse{50%{opacity:.4}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Pizza in teglia<br>con grano Rebelde</h1>
+    <p class="sub">Rispondi a tre domande: dosi, passaggi e orari si adattano.</p>
+  </header>
+
+  <section class="card" aria-labelledby="h-q1">
+    <h2 id="h-q1">1. Quanta pizza e che impasto</h2>
+    <div class="inputs">
+      <label for="n">Numero di teglie
+        <input id="n" type="number" inputmode="numeric" min="1" max="60" step="1">
+      </label>
+      <label for="fmt">Formato teglia
+        <select id="fmt">
+          <option value="60">60×40 cm</option>
+          <option value="46">46×33 cm</option>
+          <option value="altro">Altro formato</option>
+        </select>
+      </label>
+      <label for="g">Impasto per teglia (g)
+        <input id="g" type="number" inputmode="numeric" min="100" step="10">
+      </label>
+    </div>
+    <fieldset>
+      <legend>Tipo di impasto</legend>
+      <div class="chips" id="chips-style"></div>
+    </fieldset>
+    <div class="inputs">
+      <label for="idr">Acqua (% sulla farina)
+        <input id="idr" type="number" inputmode="numeric" min="55" max="78" step="1">
+      </label>
+    </div>
+    <p class="sub">Se l'impasto è sodo o la farina assorbe molta acqua, sali di qualche punto. Se si strappa o è molle, scendi.</p>
+  </section>
+
+  <section class="card" aria-labelledby="h-q2">
+    <h2 id="h-q2">2. Che impastatrice hai</h2>
+    <fieldset>
+      <legend>Tipo di impastatrice</legend>
+      <div class="chips" id="chips-mixer"></div>
+    </fieldset>
+    <div class="inputs">
+      <label for="cap">Capacità (kg di impasto)
+        <input id="cap" type="number" inputmode="decimal" min="0.5" step="0.5">
+      </label>
+      <label for="room">Temperatura del locale (°C)
+        <input id="room" type="number" inputmode="numeric" min="5" max="35" step="1">
+      </label>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="h-q3">
+    <h2 id="h-q3">3. Quando</h2>
+    <div class="inputs">
+      <div class="row">
+        <label for="start">Inizio impasto
+          <input id="start" type="datetime-local">
+        </label>
+        <button type="button" class="btn" id="now">Adesso</button>
+      </div>
+      <label for="bake">Ora di infornata
+        <input id="bake" type="datetime-local">
+      </label>
+    </div>
+    <p class="msg" id="timemsg" role="status"></p>
+  </section>
+
+  <section class="card" aria-labelledby="h-dosi">
+    <h2 id="h-dosi">Dosi</h2>
+    <table>
+      <thead><tr id="dose-head"></tr></thead>
+      <tbody id="dose-body"></tbody>
+    </table>
+    <div class="tot" id="pills"></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-reg">
+    <h2 id="h-reg">Regole che si applicano</h2>
+    <ul class="rules" id="rules"></ul>
+  </section>
+
+  <section class="card" aria-labelledby="h-piano">
+    <h2 id="h-piano">Piano</h2>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-impasto" aria-selected="true" aria-controls="panel">Impasto</button>
+      <button class="tab" role="tab" id="tab-frigo" aria-selected="false" aria-controls="panel">In frigo</button>
+      <button class="tab" role="tab" id="tab-forno" aria-selected="false" aria-controls="panel">Forno</button>
+    </div>
+    <div id="panel" role="tabpanel"></div>
+    <button class="btn reset" id="reset" type="button">Azzera spunte</button>
+  </section>
+</main>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var store={
+    get:function(k){try{return localStorage.getItem(k)}catch(e){return null}},
+    set:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+  };
+  function pad(n){return (n<10?'0':'')+n}
+  function gr(x){return Math.round(x).toLocaleString('it-IT')+' g'}
+  function gr1(x){return (Math.round(x*10)/10).toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})+' g'}
+  function toInput(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())}
+  function fmtT(d){return d.toLocaleString('it-IT',{weekday:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+  function fmtClock(s){return pad(Math.floor(s/60))+':'+pad(s%60)}
+
+  /* ---- Tipi di impasto ---- */
+  var STYLES={
+    classica:{name:'Teglia classica',d:'Alveolata, 63% acqua',idr:63,olio:2,proof:50,w:{'60':850,'46':475}},
+    alta:{name:'Alta e soffice',d:'Tipo focaccia, 68% acqua',idr:68,olio:3,proof:90,w:{'60':1100,'46':700}},
+    sottile:{name:'Sottile e croccante',d:'60% acqua, 35 min in teglia',idr:60,olio:2,proof:35,w:{'60':600,'46':380}}
+  };
+
+  /* ---- Impastatrici ---- */
+  function temp(){return {h:'Misura la temperatura',p:'Obiettivo 20-22 °C a fine impasto.',note:'Sopra i 24 °C: la prossima volta acqua più fredda, anche con ghiaccio.'}}
+  function rest(t,min){return {t:t,h:'Riposo in vasca',p:'Copri e lascia '+min+' minuti.',timer:min*60}}
+  function autolisi(t,min){return {t:t,h:'Autolisi',p:'Ferma la macchina, copri e lascia '+min+' minuti.',note:'Con farina macinata in casa questo passaggio aiuta molto.',timer:min*60}}
+  function carica(c,extra){return {t:0,h:'Carica la vasca',p:'Metti '+c.acIn+' di acqua a circa '+c.tw+' °C (tieni da parte '+c.res+') e poi '+c.fl+' di farina.'+(extra||'')}}
+
+  var MIXERS={
+    mono:{
+      name:'Spirale a una velocità',d:'Come la tua Cuppone',cap:30,fric:6,work:25,end:70,
+      rule:'Una sola velocità: non c\'è la seconda per incordare. Si lavora a intervalli, controllando l\'incordatura. Conta 12-16 minuti di lavoro effettivo. Scalda poco, quindi l\'acqua può essere meno fredda.',
+      steps:function(c){var t=temp();return [
+        carica(c),
+        {t:3,h:'Mescola per amalgamare',p:'Velocità unica, 3-4 minuti, finché non c\'è più farina asciutta. Niente lievito né sale.',timer:240},
+        autolisi(7,25),
+        {t:32,h:'Aggiungi il lievito',p:'Sciogli '+c.lv+' di lievito fresco in un po\' dell\'acqua tenuta da parte e versalo. Impasta 3 minuti.',timer:180},
+        {t:36,h:'Aggiungi il sale',p:'Versa il sale ('+c.sa+') sciolto nel resto dell\'acqua. Impasta 4-5 minuti fino ad assorbimento.',timer:270},
+        {t:41,h:'Olio e incordatura',p:'Versa l\'olio ('+c.ol+') a filo e continua 3-6 minuti, fermandoti ogni 2 per controllare. Fermati quando l\'impasto si stacca dalla vasca e incorda.',note:'Se il gancio gira senza lavorare l\'impasto, ferma, raccogli dai bordi e riparti.',timer:360},
+        {t:48,h:t.h,p:t.p,note:t.note},
+        rest(49,20)
+      ]}
+    },
+    spirale2:{
+      name:'Spirale a due velocità',d:'1ª per amalgamare, 2ª per incordare',cap:30,fric:10,work:25,end:68,
+      rule:'Prima velocità per amalgamare e assorbire, seconda solo 3-5 minuti per incordare. La seconda scalda molto: acqua più fredda.',
+      steps:function(c){var t=temp();return [
+        carica(c),
+        {t:3,h:'Mescola in prima velocità',p:'4 minuti, solo per amalgamare. Niente lievito né sale.',timer:240},
+        autolisi(7,25),
+        {t:32,h:'Aggiungi il lievito',p:'Sciogli '+c.lv+' di lievito fresco in un po\' d\'acqua e versalo. Prima velocità per 5 minuti.',timer:300},
+        {t:37,h:'Sale e olio',p:'Versa il sale ('+c.sa+') sciolto nel resto dell\'acqua, prima velocità fino ad assorbimento, poi l\'olio ('+c.ol+') a filo.',timer:240},
+        {t:42,h:'Seconda velocità',p:'3-5 minuti, finché l\'impasto si stacca dalla vasca e incorda. Non esagerare.',timer:240},
+        {t:47,h:t.h,p:t.p,note:t.note},
+        rest(48,20)
+      ]}
+    },
+    forcella:{
+      name:'Forcella',d:'Lavora piano, scalda poco',cap:20,fric:5,work:30,end:73,
+      rule:'La forcella lavora piano e scalda poco, ma serve più tempo: 8-12 minuti oltre l\'assorbimento. Si ferma quando l\'impasto è liscio e non si attacca ai bracci.',
+      steps:function(c){var t=temp();return [
+        carica(c),
+        {t:3,h:'Mescola per amalgamare',p:'4 minuti, finché non c\'è più farina asciutta. Niente lievito né sale.',timer:240},
+        autolisi(7,25),
+        {t:32,h:'Aggiungi il lievito',p:'Sciogli '+c.lv+' di lievito fresco in un po\' d\'acqua e versalo. Impasta 4 minuti.',timer:240},
+        {t:36,h:'Aggiungi il sale',p:'Versa il sale ('+c.sa+') sciolto nel resto dell\'acqua. Impasta 5 minuti fino ad assorbimento.',timer:300},
+        {t:41,h:'Olio e incordatura',p:'Versa l\'olio ('+c.ol+') a filo e continua 8-12 minuti, controllando ogni 3, finché è liscio e si stacca dai bracci.',timer:600},
+        {t:52,h:t.h,p:t.p,note:t.note},
+        rest(53,20)
+      ]}
+    },
+    planetaria:{
+      name:'Planetaria con gancio',d:'Piccoli lotti, velocità minima',cap:2,fric:10,work:30,end:67,
+      rule:'Gancio a uncino, velocità minima e poi la 2. Fermati ogni 3-4 minuti per non surriscaldare il motore. Il carico massimo è basso, quindi fai più lotti.',
+      steps:function(c){var t=temp();return [
+        carica(c),
+        {t:3,h:'Mescola alla velocità minima',p:'4 minuti, finché non c\'è più farina asciutta. Niente lievito né sale.',timer:240},
+        autolisi(7,25),
+        {t:32,h:'Aggiungi il lievito',p:'Sciogli '+c.lv+' di lievito fresco in un po\' d\'acqua e versalo. Velocità minima per 3 minuti.',timer:180},
+        {t:36,h:'Aggiungi il sale',p:'Versa il sale ('+c.sa+') sciolto nel resto dell\'acqua. Velocità minima per 4 minuti.',timer:240},
+        {t:41,h:'Olio e incordatura',p:'Versa l\'olio ('+c.ol+') a filo, poi seconda velocità per 3-4 minuti. Ferma il motore se si scalda.',timer:240},
+        {t:46,h:t.h,p:t.p,note:t.note},
+        rest(47,20)
+      ]}
+    },
+    mano:{
+      name:'A mano',d:'Pieghe invece dell\'impastatrice',cap:4,fric:2,work:40,end:142,
+      rule:'A mano il glutine si costruisce con le pieghe ogni 30 minuti, non con la fatica. Serve più tempo, ma non scalda l\'impasto.',
+      steps:function(c){var t=temp();return [
+        carica(c,' Mescola con la mano per 5 minuti, finché non c\'è più farina asciutta.'),
+        autolisi(5,30),
+        {t:35,h:'Aggiungi il lievito',p:'Sciogli '+c.lv+' di lievito fresco in un po\' d\'acqua e incorporalo con il metodo a pinza, 5 minuti.',timer:300},
+        {t:41,h:'Aggiungi il sale',p:'Versa il sale ('+c.sa+') sciolto nel resto dell\'acqua e incorpora 5 minuti.',timer:300},
+        {t:47,h:'Aggiungi l\'olio',p:'Versa l\'olio ('+c.ol+') a filo e incorpora 3 minuti.',timer:180},
+        {t:51,h:t.h,p:t.p,note:t.note},
+        {t:52,h:'Prima piega',p:'Tira i lembi dell\'impasto verso il centro, tutto il giro. Copri.'},
+        {t:82,h:'Seconda piega',p:'Stessa piega, più delicata. Copri.'},
+        {t:112,h:'Terza piega',p:'Ultima piega. Poi riposo di 30 minuti.',timer:1800}
+      ]}
+    }
+  };
+
+  /* ---- Stato ---- */
+  var S={n:12,fmt:'60',style:'classica',g:0,idr:0,mixer:'mono',cap:30,room:20,start:'',bake:''};
+  try{var sv=JSON.parse(store.get('pizza-state')||'{}');for(var k in sv){if(k in S)S[k]=sv[k]}}catch(e){}
+  var done={},sig='';
+  try{var dd=JSON.parse(store.get('pizza-done')||'{}');done=dd.done||{};sig=dd.sig||''}catch(e){}
+  var tab='impasto';
+
+  function defaultDates(){
+    var now=new Date();now.setMinutes(Math.ceil(now.getMinutes()/15)*15,0,0);
+    var b=new Date(now.getFullYear(),now.getMonth(),now.getDate()+2,20,0,0);
+    return {start:toInput(now),bake:toInput(b)};
+  }
+  if(isNaN(new Date(S.start))||isNaN(new Date(S.bake))){var dflt=defaultDates();S.start=dflt.start;S.bake=dflt.bake}
+
+  /* ---- Calcolo ---- */
+  function compute(){
+    var st=STYLES[S.style],mx=MIXERS[S.mixer];
+    var n=Math.max(1,+S.n||1);
+    var g=S.g||(S.fmt==='altro'?800:st.w[S.fmt]);
+    var idr=(S.idr||st.idr)/100;
+    var total=n*g;
+    var capG=Math.max(0.5,+S.cap||mx.cap)*1000;
+    var N=Math.max(1,Math.ceil(total/capG-1e-9));
+    var start=new Date(S.start),bake=new Date(S.bake);
+    var fi=new Date(start.getTime()+(mx.end+(N-1)*mx.work)*60000);
+    var out=new Date(bake.getTime()-(st.proof+15+150)*60000);
+    var hours=(out-fi)/3600000;
+    var yPct=hours>0?Math.min(0.3,Math.max(0.03,0.07*Math.pow(48/Math.max(hours,1),1.1))):0.3;
+    var fl=total/(1+idr+0.025+st.olio/100+yPct/100);
+    var room=isFinite(+S.room)&&S.room!==''?+S.room:20;
+    var tw=Math.max(3,Math.round(63-(2*room+mx.fric)));
+    return {st:st,mx:mx,n:n,g:g,idr:idr,total:total,capG:capG,N:N,start:start,bake:bake,fi:fi,out:out,hours:hours,
+            yPct:yPct,fl:fl,ac:fl*idr,sa:fl*0.025,ol:fl*st.olio/100,lv:fl*yPct/100,tw:tw};
+  }
+
+  function buildSteps(r){
+    var N=r.N,res=r.ac/N*0.08;
+    var c={fl:gr(r.fl/N),ac:gr(r.ac/N),acIn:gr(r.ac/N-res),res:gr(Math.round(res/10)*10),
+           lv:gr1(r.lv/N),sa:gr(r.sa/N),ol:gr(r.ol/N),tw:r.tw};
+    var list=[],ms=60000;
+    function add(phase,time,s){list.push({phase:phase,time:time,h:s.h,p:s.p,note:s.note,timer:s.timer})}
+    if(N>1)add('impasto',r.start,{h:'Lotti',p:'Servono '+N+' lotti da circa '+(r.total/N/1000).toFixed(1).replace('.',',')+' kg di impasto. Ripeti i passaggi per ogni lotto e metti ciascun lotto in frigo appena è pronto.'});
+    r.mx.steps(c).forEach(function(s){add('impasto',new Date(r.start.getTime()+s.t*ms),s)});
+    var vasch=Math.max(1,Math.ceil(r.total/6000));
+    add('impasto',r.fi,{h:'In contenitore e in frigo',p:'Ungi circa '+vasch+(vasch>1?' vaschette':' vaschetta')+' larghe e basse (tipo GN 1/1) e riempile fino a 5-6 cm di altezza: l\'impasto deve poter raddoppiare. Copri senza sigillare e metti a 3-5 °C.'});
+    if(r.hours>20)add('frigo',new Date(r.fi.getTime()+120*ms),{h:'Piega di rinforzo',p:'Tira i lembi dall\'esterno verso il centro nel contenitore, con delicatezza.',note:'Aiuta il raffreddamento e rinforza l\'impasto. Con un carico basso in impastatrice è più utile.'});
+    if(r.hours>0){
+      var cs=r.hours>36?[0.35,0.7]:[0.5];
+      cs.forEach(function(f,i){add('frigo',new Date(r.fi.getTime()+f*r.hours*3600000),{h:'Controllo '+(i+1),p:'Guarda i contenitori.',note:'Più che raddoppiato: sposta nel punto più freddo del frigo. Quasi uguale a quando l\'hai messo: è normale, riparte quando esce dal frigo.'})});
+    }
+    add('forno',r.out,{h:'Fuori dal frigo',p:'Togli i contenitori e lasciali a temperatura ambiente, coperti.'});
+    var stendi=new Date(r.bake.getTime()-(r.st.proof+15)*ms);
+    add('forno',stendi,{h:'Taglia e stendi',p:'Rovescia sul piano infarinato senza sgonfiare. Taglia a pezzi da circa '+gr(r.g)+' e stendi nella teglia con un filo d\'olio.'});
+    add('forno',new Date(stendi.getTime()+5*ms),{h:'Lievitazione in teglia',p:r.st.proof+' minuti prima di condire.',timer:r.st.proof*60});
+    add('forno',new Date(r.bake.getTime()-30*ms),{h:'Accendi il forno',p:'Al massimo, 250-270 °C. Se la base cuoce piano, teglia sul livello più basso.'});
+    add('forno',r.bake,{h:'Condisci e inforna',p:'Buona pizza.'});
+    list.sort(function(a,b){return a.time-b.time});
+    return list;
+  }
+
+  /* ---- Rendering delle domande ---- */
+  function chips(id,name,data,key){
+    var box=$(id);box.innerHTML='';
+    Object.keys(data).forEach(function(k){
+      var lab=document.createElement('label');lab.className='chip';
+      var inp=document.createElement('input');inp.type='radio';inp.name=name;inp.value=k;
+      lab.appendChild(inp);
+      var b=document.createElement('b');b.textContent=data[k].name;lab.appendChild(b);
+      var s=document.createElement('span');s.textContent=data[k].d;lab.appendChild(s);
+      inp.addEventListener('change',function(){
+        S[key]=k;
+        if(key==='style'){S.g=0;S.idr=0}
+        if(key==='mixer'){S.cap=MIXERS[k].cap}
+        update();
+      });
+      box.appendChild(lab);
+    });
+  }
+  function syncChips(id,val){
+    var labs=$(id).children;
+    for(var i=0;i<labs.length;i++){
+      var inp=labs[i].querySelector('input');
+      inp.checked=inp.value===val;
+      labs[i].classList.toggle('on',inp.checked);
+    }
+  }
+  function setVal(id,v){if(document.activeElement!==$(id))$(id).value=v}
+
+  function update(){
+    var r=compute();
+    var ok=!isNaN(r.start)&&!isNaN(r.bake);
+    syncChips('chips-style',S.style);syncChips('chips-mixer',S.mixer);
+    setVal('n',S.n);$('fmt').value=S.fmt;
+    setVal('g',r.g);setVal('idr',Math.round(r.idr*100));setVal('cap',r.capG/1000);setVal('room',S.room);
+    setVal('start',S.start);setVal('bake',S.bake);
+    store.set('pizza-state',JSON.stringify(S));
+
+    /* tempi */
+    var tm=$('timemsg');tm.className='msg';
+    if(!ok){tm.textContent='Imposta inizio impasto e ora di infornata.';tm.classList.add('bad')}
+    else if(r.bake<=r.start){tm.textContent='L\'infornata deve essere dopo l\'inizio dell\'impasto.';tm.classList.add('bad')}
+    else if(r.hours<12){tm.textContent='In frigo restano solo '+Math.max(0,Math.round(r.hours))+' ore: troppo poche per questa ricetta. Anticipa l\'inizio o sposta l\'infornata.';tm.classList.add('bad')}
+    else if(r.hours>96){tm.textContent='In frigo restano circa '+Math.round(r.hours)+' ore: più di 4 giorni è troppo per una farina di cui non conosci la forza. Ritarda l\'inizio.';tm.classList.add('bad')}
+    else tm.textContent='In frigo circa '+Math.round(r.hours)+' ore, da '+fmtT(r.fi)+' a '+fmtT(r.out)+'.';
+    if(!ok||r.bake<=r.start){renderDose(r);renderRules(r,false);$('panel').innerHTML='<p class="msg bad">Correggi gli orari per vedere il piano.</p>';return}
+
+    renderDose(r);renderRules(r,true);
+
+    /* spunte: si azzerano se cambia la ricetta (non gli orari) */
+    var ns=[S.n,S.fmt,S.style,S.g,S.idr,S.mixer,S.cap].join('|');
+    if(ns!==sig){done={};sig=ns;store.set('pizza-done',JSON.stringify({sig:sig,done:done}))}
+    renderPlan(r);
+  }
+
+  function renderDose(r){
+    var multi=r.N>1;
+    $('dose-head').innerHTML='<th scope="col">Ingrediente</th><th scope="col">Totale</th>'+(multi?'<th scope="col">Per lotto</th>':'');
+    var rows=[
+      ['Farina Rebelde','',r.fl,gr],
+      ['Acqua fredda','a circa '+r.tw+' °C',r.ac,gr],
+      ['Sale','2,5%',r.sa,gr],
+      ['Olio EVO',r.st.olio+'%',r.ol,gr],
+      ['Lievito di birra fresco',(Math.round(r.yPct*100)/100).toLocaleString('it-IT')+'% in base alle ore di frigo',r.lv,gr1]
+    ];
+    $('dose-body').innerHTML=rows.map(function(x){
+      return '<tr><td>'+x[0]+(x[1]?'<small>'+x[1]+'</small>':'')+'</td><td class="v">'+x[3](x[2])+'</td>'+(multi?'<td class="v">'+x[3](x[2]/r.N)+'</td>':'')+'</tr>';
+    }).join('');
+    $('pills').innerHTML=
+      '<div class="pill"><b>'+(r.total/1000).toFixed(2).replace('.',',')+' kg</b><span>impasto totale</span></div>'+
+      '<div class="pill"><b>'+r.N+'</b><span>'+(r.N>1?'lotti da circa '+(r.total/r.N/1000).toFixed(1).replace('.',',')+' kg':'lotto unico')+'</span></div>'+
+      '<div class="pill"><b>'+r.n+' × '+gr(r.g)+'</b><span>teglie</span></div>';
+  }
+
+  function renderRules(r,full){
+    var L=[];
+    var pct=Math.round(r.total/r.N/r.capG*100);
+    L.push('<b>'+r.mx.name+'.</b> '+r.mx.rule);
+    L.push('<b>Acqua a circa '+r.tw+' °C</b> per arrivare a 20-22 °C, con locale a '+(S.room===''?20:S.room)+' °C.');
+    if(pct<25)L.push('<b>Carico basso ('+pct+'% della capacità).</b> Il gancio ha poca presa: allunga di qualche minuto, controlla spesso e fai la piega di rinforzo in frigo.');
+    else if(pct<40)L.push('<b>Carico moderato ('+pct+'% della capacità).</b> Va bene, ma controlla l\'incordatura prima di fermarti e fai la piega di rinforzo.');
+    else L.push('<b>Carico buono ('+pct+'% della capacità).</b>');
+    if(r.N>1)L.push('<b>'+r.N+' lotti.</b> La capacità è inferiore all\'impasto totale: lavora un lotto alla volta, ciascuno con le dosi della colonna "Per lotto".');
+    L.push('<b>'+r.st.name+'.</b> Acqua '+Math.round(r.idr*100)+'%, olio '+r.st.olio+'%, circa '+gr(r.g)+' a teglia, '+r.st.proof+' minuti di lievitazione in teglia prima di infornare.');
+    if(full&&r.hours>0)L.push('<b>Maturazione di circa '+Math.round(r.hours)+' ore in frigo.</b> Il lievito è '+(Math.round(r.yPct*100)/100).toLocaleString('it-IT')+'% sulla farina: con più ore se ne usa meno, con meno ore di più.');
+    L.push('<b>Frigo e forno.</b> Frigo a 3-5 °C. Forno al massimo (250-270 °C), teglia sul livello basso se la base cuoce piano.');
+    $('rules').innerHTML=L.map(function(x){return '<li>'+x+'</li>'}).join('');
+  }
+
+  /* ---- Timer ---- */
+  var audio=null,timers={};
+  function beep(){
+    try{
+      if(!audio)audio=new (window.AudioContext||window.webkitAudioContext)();
+      var o=audio.createOscillator(),gn=audio.createGain();
+      o.connect(gn);gn.connect(audio.destination);o.frequency.value=880;gn.gain.value=.2;
+      o.start();o.stop(audio.currentTime+.6);
+    }catch(e){}
+    try{if(navigator.vibrate)navigator.vibrate([300,150,300])}catch(e){}
+  }
+  function startTimer(id,secs,el){
+    if(timers[id])clearInterval(timers[id]);
+    var end=Date.now()+secs*1000;
+    el.classList.remove('ring');el.textContent=fmtClock(secs);
+    try{if(!audio)audio=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}
+    timers[id]=setInterval(function(){
+      var left=Math.max(0,Math.round((end-Date.now())/1000));
+      el.textContent=fmtClock(left);
+      if(left===0){clearInterval(timers[id]);el.classList.add('ring');el.textContent='Tempo scaduto';beep()}
+    },500);
+  }
+
+  /* ---- Piano ---- */
+  function renderPlan(r){
+    var list=buildSteps(r).filter(function(s){return s.phase===tab});
+    var panel=$('panel');panel.innerHTML='';
+    if(!list.length){panel.innerHTML='<p class="msg">Nessun passaggio in questa fase.</p>';return}
+    list.forEach(function(s,i){
+      var key=s.phase+':'+s.h;
+      var wrap=document.createElement('div');wrap.className='step'+(done[key]?' done':'');
+      var cb=document.createElement('input');cb.type='checkbox';cb.checked=!!done[key];
+      cb.setAttribute('aria-labelledby','sh-'+i);
+      cb.addEventListener('change',function(){
+        done[key]=cb.checked;store.set('pizza-done',JSON.stringify({sig:sig,done:done}));
+        wrap.classList.toggle('done',cb.checked);
+      });
+      var body=document.createElement('div');body.className='body';
+      body.innerHTML='<div class="when">'+fmtT(s.time)+'</div><h3 id="sh-'+i+'">'+s.h+'</h3><p>'+s.p+'</p>'+(s.note?'<p class="note">'+s.note+'</p>':'');
+      if(s.timer){
+        var t=document.createElement('div');t.className='timer';
+        var b=document.createElement('button');b.type='button';b.className='btn';
+        b.textContent='Avvia timer '+Math.round(s.timer/60)+' min';
+        var c=document.createElement('span');c.className='clock';
+        b.addEventListener('click',function(){startTimer(key,s.timer,c)});
+        t.appendChild(b);t.appendChild(c);body.appendChild(t);
+      }
+      wrap.appendChild(cb);wrap.appendChild(body);panel.appendChild(wrap);
+    });
+  }
+
+  /* ---- Eventi ---- */
+  chips('chips-style','style',STYLES,'style');
+  chips('chips-mixer','mixer',MIXERS,'mixer');
+  $('n').addEventListener('input',function(){S.n=parseFloat(this.value)||0;update()});
+  $('fmt').addEventListener('change',function(){S.fmt=this.value;S.g=0;update()});
+  $('g').addEventListener('input',function(){S.g=parseFloat(this.value)||0;update()});
+  $('idr').addEventListener('input',function(){S.idr=parseFloat(this.value)||0;update()});
+  $('cap').addEventListener('input',function(){S.cap=parseFloat(this.value)||0;update()});
+  $('room').addEventListener('input',function(){S.room=this.value===''?'':parseFloat(this.value);update()});
+  $('start').addEventListener('input',function(){S.start=this.value;update()});
+  $('bake').addEventListener('input',function(){S.bake=this.value;update()});
+  $('now').addEventListener('click',function(){var d=defaultDates();S.start=d.start;update()});
+  ['impasto','frigo','forno'].forEach(function(k){
+    $('tab-'+k).addEventListener('click',function(){
+      tab=k;
+      ['impasto','frigo','forno'].forEach(function(x){$('tab-'+x).setAttribute('aria-selected',x===k?'true':'false')});
+      update();
+    });
+  });
+  $('reset').addEventListener('click',function(){done={};store.set('pizza-done',JSON.stringify({sig:sig,done:done}));update()});
+  update();
+})();
+</script>
+</body>
+</html>
