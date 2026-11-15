@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lievitati Scacchiera</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#d9561a">
+<link rel="icon" href="icona-192.png">
+<link rel="apple-touch-icon" href="icona-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -106,6 +110,8 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
 .howto figcaption{font-weight:600;font-size:.95rem;min-height:2.8em;padding:0 4px}
 .switch{flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-size:.95rem;cursor:pointer}
 .switch input{width:22px;height:22px;accent-color:var(--ember)}
+.bell{font:inherit;font-size:.8rem;font-weight:700;border-radius:999px;padding:5px 10px;border:1.5px solid var(--tomato);color:var(--tomato);background:#fbe9e5;cursor:pointer;white-space:nowrap}
+.bell.on{border-color:var(--basil);color:var(--basil);background:#e7f3e6}
 .dots{display:flex;gap:5px}
 .dots i{width:8px;height:8px;border-radius:50%;background:#d9d2c8}
 .dots i.on{background:var(--ember)}
@@ -377,6 +383,7 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
     if(!('Notification' in window)||Notification.permission!=='default')return;
     try{const p=Notification.requestPermission(()=>render());if(p&&p.then)p.then(()=>render())}catch(e){}
   }
+  const notifOn=()=>('Notification' in window)&&Notification.permission==='granted';
   function notifText(){
     if(!('Notification' in window))return 'Notifiche non disponibili in questo browser.';
     if(Notification.permission==='granted')return 'Notifiche attive. Arrivano finché la pagina resta aperta, anche in secondo piano.';
@@ -625,6 +632,7 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
         '<p class="sub">Cambiando questi valori si spostano gli orari di uscita dal frigo, stesura e forno. Le dosi restano quelle già pesate.</p>'+
         '<h3 class="grp">Avvisi</h3><p class="sub">'+notifText()+'</p>'+
         (('Notification' in window)&&Notification.permission==='default'?'<button type="button" class="btn ghost small" data-act="notif">Attiva notifiche</button>':'')+
+        (notifOn()?'<button type="button" class="btn ghost small" data-act="testn">Manda una notifica di prova</button>':'')+
         '<button type="button" class="btn ghost small" data-act="ics">Metti i promemoria nel calendario</button>'+
         '<p class="sub">I promemoria del calendario suonano anche con l\'app chiusa: usali per i controlli in frigo e per il giorno del forno.</p>'+
         '<label class="switch"><input type="checkbox" id="awake"'+(awakeOn?' checked':'')+'> Tieni lo schermo acceso</label>'+
@@ -645,7 +653,7 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
       lastSig='wiz'+wiz;return;
     }
     const P=build(SES.inp,SES.t0,SES),stt=state(P),n=P.steps.length,dn=P.steps.filter(s=>SES.done[s.id]).length,pc=Math.round(dn/n*100);
-    top.innerHTML='<div class="pbar'+(pc===100?' full':'')+'" role="progressbar" aria-label="Completamento" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pc+'"><div style="width:'+pc+'%"></div></div><span class="cnt">'+dn+' di '+n+' · '+pc+'%</span>';
+    top.innerHTML='<div class="pbar'+(pc===100?' full':'')+'" role="progressbar" aria-label="Completamento" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pc+'"><div style="width:'+pc+'%"></div></div><span class="cnt">'+dn+' di '+n+'</span><button type="button" class="bell'+(notifOn()?' on':'')+'" data-act="bell">'+(notifOn()?'Avvisi attivi':'Avvisi spenti')+'</button>';
     if(view==='sum'){
       v.innerHTML=sumHtml(P,stt);
       bar.innerHTML='<button type="button" class="btn big" data-act="back">Torna a cosa fare adesso</button>';
@@ -700,6 +708,8 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
     else if(a==='sum'){view='sum';render();$('view').scrollTop=0}
     else if(a==='back'){view='now';confirmEnd=false;render();$('view').scrollTop=0}
     else if(a==='notif')askNotif();
+    else if(a==='bell'){if(('Notification' in window)&&Notification.permission==='default')askNotif();else{view='sum';sumTab='altro';render();$('view').scrollTop=0}}
+    else if(a==='testn')notify('Notifica di prova','Se la vedi e la senti, gli avvisi funzionano.');
     else if(a==='ics')downloadIcs();
     else if(a==='calib'){S.fric=+t.dataset.v;saveS();t.textContent='Salvato per la prossima volta';t.disabled=true}
     else if(a==='end'){if(!confirmEnd){confirmEnd=true;render()}else endSes()}
