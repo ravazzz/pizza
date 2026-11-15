@@ -380,7 +380,7 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
   };
 
   /* ---- Stato ---- */
-  var S={n:12,fmt:'60',style:'classica',g:0,idr:0,mixer:'mono',cap:30,room:16,flourT:'',target:21,fric:'',meas:'',fridge:4,room2:18,proofT:24,start:'',bake:'',started:''};
+  var S={n:12,fmt:'60',style:'classica',g:0,idr:0,mixer:'mono',cap:30,room:16,flourT:'',target:21,fric:'',meas:'',fridge:4,room2:18,proofT:24,start:'',bake:'',started:'',shift:0};
   try{var sv=JSON.parse(store.get('pizza-state')||'{}');for(var k in sv){if(k in S)S[k]=sv[k]}}catch(e){}
   var done={},sig='';
   try{var dd=JSON.parse(store.get('pizza-done')||'{}');done=dd.done||{};sig=dd.sig||''}catch(e){}
@@ -410,7 +410,7 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
     /* martedì: più freddo = più tempo (circa il doppio ogni 8 °C) */
     var outMin=Math.round(clamp(150*Math.pow(2,(20-r2)/8),60,360)/5)*5;
     var proofMin=Math.round(clamp(st.proof*Math.pow(2,(24-pT)/8),20,240)/5)*5;
-    var start=new Date(S.start),bake=new Date(S.bake);
+    var start=new Date(new Date(S.start).getTime()+(+S.shift||0)*60000),bake=new Date(S.bake);
     var foldMin=S.mixer==='mano'?0:20;
     var fi=new Date(start.getTime()+(mx.end+foldMin+(N-1)*mx.work)*60000);
     var out=new Date(bake.getTime()-(proofMin+15+outMin)*60000);
@@ -446,8 +446,8 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
     if(N>1)add('impasto',r.start,{h:'Lotti',p:'Servono '+N+' lotti da circa '+(r.total/N/1000).toFixed(1).replace('.',',')+' kg di impasto. Ripeti i passaggi per ogni lotto e metti ciascun lotto in frigo appena è pronto.'});
     r.mx.steps(c).forEach(function(s){add('impasto',new Date(r.start.getTime()+s.t*ms),s)});
     var vasch=Math.max(1,Math.ceil(r.total/6000));
-    if(r.foldMin)add('impasto',new Date(r.fi.getTime()-r.foldMin*ms),{h:'In vaschetta e pieghe',p:'Dividi l\'impasto nelle vaschette. Con le mani bagnate tira un lembo verso l\'alto e ripiegalo sul centro, gira la vaschetta di un quarto e ripeti: 4 pieghe per giro, 2 giri.',note:'Se la superficie resta grezza o strappata, ripeti dopo 15 minuti. Deve diventare una pagnotta liscia e bombata.',timer:900});
-    add('impasto',r.fi,{h:'Olio, copri e in frigo',p:'Usa circa '+vasch+(vasch>1?' vaschette':' vaschetta')+' (tipo GN 1/1), con l\'impasto alto 5-6 cm: deve poter raddoppiare. Ungi la superficie e i bordi con un filo d\'olio, copri bene con coperchio o pellicola e metti in frigo ('+t1(r.fr)+' °C).'});
+    if(r.foldMin)add('impasto',new Date(r.fi.getTime()-r.foldMin*ms),{h:'In vaschetta e pieghe',p:'Ungi con un filo d\'olio il fondo e i bordi delle vaschette (non l\'impasto) e dividi l\'impasto. Con le mani bagnate tira un lembo verso l\'alto e ripiegalo sul centro, gira la vaschetta di un quarto e ripeti: 4 pieghe per giro, 2 giri.',note:'Deve diventare una pagnotta liscia e bombata. Se lo è già, premi Fatto e passa al frigo. Se la superficie resta grezza o strappata, aspetta il timer e ripeti.',timer:900});
+    add('impasto',r.fi,{h:'Copri e in frigo',p:'Copri bene le vaschette con il coperchio o con la pellicola tesa sopra il bordo, senza olio sull\'impasto, e mettile in frigo ('+t1(r.fr)+' °C).',note:'Servono circa '+vasch+(vasch>1?' vaschette':' vaschetta')+' tipo GN 1/1, con l\'impasto alto 5-6 cm: deve poter raddoppiare.'});
     if(r.hours>20)add('frigo',new Date(r.fi.getTime()+120*ms),{h:'Piega di rinforzo (facoltativa)',p:'Tira i lembi dall\'esterno verso il centro nel contenitore, con delicatezza.',note:'Aiuta il raffreddamento e rinforza l\'impasto. Con un carico basso in impastatrice è più utile.'});
     if(r.hours>0){
       var cs=r.hours>36?[0.35,0.7]:[0.5];
@@ -692,8 +692,7 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
       var cb=document.createElement('input');cb.type='checkbox';cb.checked=!!done[key];
       cb.setAttribute('aria-labelledby','sh-'+i);
       cb.addEventListener('change',function(){
-        done[key]=cb.checked;store.set('pizza-done',JSON.stringify({sig:sig,done:done}));
-        wrap.classList.toggle('done',cb.checked);progress();
+        completeStep(key,cb.checked);
       });
       var body=document.createElement('div');body.className='body';
       body.innerHTML='<div class="when">'+fmtT(s.time)+'</div><h3 id="sh-'+i+'">'+s.h+'</h3><p>'+s.p+'</p>'+(s.note?'<p class="note">'+s.note+'</p>':'');
@@ -737,6 +736,19 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
     var s=Math.max(0,Math.round(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s%3600/60);
     return h?h+' h '+pad(m)+' min':pad(m)+':'+pad(s%60);
   }
+  /* segna un passaggio come fatto; se è quello in corso, il piano dell'impasto si sposta in avanti */
+  function completeStep(key,on){
+    done[key]=on;store.set('pizza-done',JSON.stringify({sig:sig,done:done}));
+    if(!on||!S.started||!lastR){update();return}
+    var all=buildSteps(lastR),now=Date.now(),ci=-1,i;
+    for(i=0;i<all.length;i++)if(all[i].time.getTime()<=now)ci=i;
+    var cur=all[ci],nxt=all[ci+1];
+    if(cur&&cur.phase+':'+cur.h===key){
+      if(running[key]){delete running[key];saveT()}
+      if(nxt&&nxt.phase!=='forno'&&nxt.time.getTime()>now){S.shift=(+S.shift||0)-Math.ceil((nxt.time.getTime()-now)/60000)}
+    }
+    boxSig='';update();
+  }
   function tickNow(){
     var r=lastR,box=$('now');if(!r||isNaN(r.start)||r.bake<=r.start){box.style.display='none';return}
     box.style.display='';
@@ -751,7 +763,7 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
         if(tt<=now&&now-tt<5*60000&&!notified[k]){notified[k]=1;store.set('pizza-notified',JSON.stringify(notified));notify('Ora: '+st.h,st.p.replace(/<[^>]+>/g,''))}
       }
     }
-    var sigNow=(S.started?'s':'n')+'|'+(cur?stepId(cur):'')+'|'+(nxt?stepId(nxt):'');
+    var sigNow=(S.started?'s':'n')+'|'+(cur?stepId(cur)+(done[cur.phase+':'+cur.h]?'d':''):'')+'|'+(nxt?stepId(nxt):'');
     var newCur=cur?stepId(cur):'';
     if(newCur!==curId){curId=newCur;renderPlan(r)}
     if(sigNow!==boxSig){
@@ -766,8 +778,11 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
           h+='<div class="lbl">Adesso · dalle '+pad(cur.time.getHours())+':'+pad(cur.time.getMinutes())+'</div><h3>'+cur.h+'</h3><p>'+cur.p+'</p>';
           if(cur.timer){
             var ck=cur.phase+':'+cur.h;
-            h+='<div class="timer"><button type="button" class="btn" data-act="timer">'+(running[ck]?'Riavvia':'Avvia')+' timer '+Math.round(cur.timer/60)+' min</button><span class="clock" data-key="'+ck.replace(/"/g,'&quot;')+'"></span></div>';
+            h+='<div class="timer"><button type="button" class="btn ghost" data-act="timer">'+(running[ck]?'Riavvia':'Avvia')+' timer '+Math.round(cur.timer/60)+' min</button><span class="clock" data-key="'+ck.replace(/"/g,'&quot;')+'"></span></div>';
           }
+          if(!done[cur.phase+':'+cur.h])h+='<button type="button" class="btn go" data-act="done">Fatto, passa al prossimo</button>'+
+            (nxt&&nxt.phase!=='forno'?'<p class="nstat">Non serve aspettare il timer: il prossimo passaggio parte da quando premi.</p>':'');
+          else h+='<p class="nstat">Fatto. Il prossimo passaggio parte all\'orario indicato sotto.</p>';
         }
         if(nxt){
           h+='<div class="lbl" style="margin-top:6px">Poi · '+fmtT(nxt.time)+'</div><div class="cd" id="cd"></div><h3 style="font-size:1.3rem">'+nxt.h+'</h3>';
@@ -788,7 +803,7 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
     var a=e.target.getAttribute&&e.target.getAttribute('data-act');
     if(a==='start'){
       var d=new Date();d.setSeconds(0,0);
-      S.start=toInput(d);S.started=d.toISOString();boxSig='';
+      S.start=toInput(d);S.started=d.toISOString();S.shift=0;boxSig='';
       done={};running={};saveT();store.set('pizza-done',JSON.stringify({sig:sig,done:done}));
       ensureAudio();askNotif();keepAwake();update();
       window.scrollTo({top:0,behavior:'smooth'});
@@ -796,6 +811,10 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
       var all=buildSteps(lastR),now=Date.now(),c=null;
       all.forEach(function(st){if(st.time.getTime()<=now)c=st});
       if(c&&c.timer){startTimer(c.phase+':'+c.h,c.timer,c.h);e.target.textContent='Riavvia timer '+Math.round(c.timer/60)+' min';renderPlan(lastR)}
+    }else if(a==='done'){
+      var al=buildSteps(lastR),nw=Date.now(),cc=null;
+      al.forEach(function(st){if(st.time.getTime()<=nw)cc=st});
+      if(cc)completeStep(cc.phase+':'+cc.h,true);
     }else if(a==='notif')askNotif();
     else if(a==='ics')downloadIcs();
   });
@@ -839,9 +858,9 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
     var id=a[0];
     $(id).addEventListener('input',function(){S[id]=this.value===''?'':parseFloat(this.value);update()});
   });
-  $('start').addEventListener('input',function(){S.start=this.value;update()});
+  $('start').addEventListener('input',function(){S.start=this.value;S.shift=0;update()});
   $('bake').addEventListener('input',function(){S.bake=this.value;update()});
-  $('startnow').addEventListener('click',function(){var d=new Date();d.setSeconds(0,0);S.start=toInput(d);update()});
+  $('startnow').addEventListener('click',function(){var d=new Date();d.setSeconds(0,0);S.start=toInput(d);S.shift=0;update()});
   ['impasto','frigo','forno'].forEach(function(k){
     $('tab-'+k).addEventListener('click',function(){
       tab=k;
@@ -849,7 +868,7 @@ ul.rules li{padding-left:14px;border-left:3px solid var(--ember-soft)}
       update();
     });
   });
-  $('reset').addEventListener('click',function(){done={};running={};saveT();S.started='';store.set('pizza-done',JSON.stringify({sig:sig,done:done}));update()});
+  $('reset').addEventListener('click',function(){done={};running={};saveT();S.started='';S.shift=0;store.set('pizza-done',JSON.stringify({sig:sig,done:done}));update()});
   update();
 })();
 </script>
