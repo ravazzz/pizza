@@ -118,6 +118,8 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
 .job .pbar{flex:none}
 .job .st{font-weight:600;font-variant-numeric:tabular-nums}
 .job .st.hot{color:var(--ember)}
+.tcard{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
 .dots{display:flex;gap:5px}
 .dots i{width:8px;height:8px;border-radius:50%;background:#d9d2c8}
 .dots i.on{background:var(--ember)}
@@ -257,6 +259,44 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
   }
   const FZ=['yPct','fl','ac','sa','ol','lv','Tw','Tres','Tmain','Tafter','Tmix','k','room','flT','tgt','fric','foldOn','nChk','total','n','g','idr','N','capG','hoursY'];
 
+  /* ---- Lievitazione stimata dalle temperature registrate ----
+     L'impasto si scalda o si raffredda verso l'ambiente con una costante di circa 3,2 ore (vaschetta da 5 kg,
+     misurata il 16/11). La velocità del lievito raddoppia ogni 8 °C e crolla sotto i 12 °C. */
+  const TAU=3.2*60;
+  const fRate=T=>Math.pow(2,(T-20)/8)*(T<12?Math.pow(2,(T-12)/3):1);
+  const isOut=ses=>{const l=(ses.log||[]).filter(e=>e.k!=='m');return l.length>0&&l[l.length-1].k==='out'};
+  function ferm(ses,r,tIn,outAt){
+    const ev=(ses.log||[]).slice().sort((a,b)=>a.t-b.t),now=Date.now(),need=300*0.25/r.yPct /* minuti a 20 °C per raddoppiare: 5 h con lo 0,25% di lievito, tarato sull'impasto del 15/11 */,st=5*60000,kf=1-Math.exp(-5/TAU);
+    let T=num(ses.meas,r.tgt),amb=r.fr,out=false,eq=0,t=tIn,i=0;const res={need:need,eta:null};
+    const end=Math.max(now,tIn)+72*3600000;
+    while(t<end){
+      while(i<ev.length&&ev[i].t<=t){const e=ev[i++];if(e.k==='out')out=true;if(e.k==='in'){out=false;if(e.amb==null)amb=r.fr}if(e.amb!=null)amb=e.amb;if(e.dough!=null)T=e.dough}
+      if(outAt!=null&&!out&&t>=now&&t>=outAt){out=true;amb=r.r2}
+      if(res.now==null&&t>=now){res.now=eq;res.T=T;res.out=out;res.amb=amb}
+      T+=(amb-T)*kf;eq+=5*fRate(T);
+      if(res.eta==null&&eq>=need)res.eta=t;
+      t+=st;
+    }
+    if(res.now==null){res.now=eq;res.T=T;res.out=out;res.amb=amb}
+    return res;
+  }
+  const FC=new Map();
+  function fermPlan(ses,r,tIn,target){
+    const now=Date.now(),key=[(ses.log||[]).length,Math.floor(now/60000),target,r.r2,ses.inp.outH||'',!!ses.done.out,ses.meas||'',tIn].join('|'),c=FC.get(ses.t0);
+    if(c&&c.key===key)return c.val;
+    const base=ferm(ses,r,tIn,null);let outAt=null,eta=base.eta,late=false;
+    if(!base.out&&!ses.done.out){
+      const man=ses.inp.outH!=null&&ses.inp.outH!==''&&+ses.inp.outH>0;
+      if(man)outAt=target-(+ses.inp.outH)*3600000;
+      else{for(let t=target;t>=now;t-=15*60000){const f=ferm(ses,r,tIn,t);if(f.eta!=null&&f.eta<=target){outAt=t;break}}if(outAt==null)outAt=now}
+      eta=ferm(ses,r,tIn,Math.max(outAt,now)).eta;
+    }
+    if(eta==null||eta>target+20*60000)late=true;
+    const val={now:base.now,need:base.need,T:base.T,out:base.out,amb:base.amb,outAt:outAt,eta:eta,late:late,target:target};
+    FC.set(ses.t0,{key:key,val:val});return val;
+  }
+  function addLog(ses,e){ses.log=ses.log||[];e.t=Date.now();ses.log.push(e);saveSes()}
+
   function build(inp,t0,ses){
     const r=compute(inp,t0,ses&&ses.fz?ses.fz.yPct:0);
     if(ses&&ses.fz)FZ.forEach(k=>{r[k]=ses.fz[k]});
@@ -276,22 +316,26 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
       else{s.plan=t;t+=s.dur*60000}
     });
     const fi=L[L.length-1].plan,ms=60000;
-    let stendi=r.bake-(r.proofMin+15)*ms;const out=stendi-r.outMin*ms,X=[];
-    /* dopo l'uscita dal frigo gli orari partono dall'ora vera di uscita */
-    if(done.out)stendi=done.out+r.outMin*ms;
+    let stendi=r.bake-(r.proofMin+15)*ms,out=stendi-r.outMin*ms,F=null;const X=[],fiId=L[L.length-1].id;
+    /* con l'impasto in frigo gli orari seguono la lievitazione stimata dalle temperature registrate */
+    if(ses&&done[fiId]){
+      F=fermPlan(ses,r,done[fiId],stendi);
+      if(!done.out&&!F.out&&F.outAt!=null)out=F.outAt;
+      if(done.out||F.out||F.late)stendi=F.eta!=null?Math.max(F.eta,done.out||0):stendi;
+    }
     const W=(id,phase,h,p,at,o)=>X.push(Object.assign({id:id,phase:phase,h:h,p:p,at:at,plan:at,wait:true,dur:0,timer:false},o||{}));
     if(r.foldOn)W('fold','frigo','Piega di rinforzo (facoltativa)','Tira i lembi dall\'esterno verso il centro nella vaschetta, con delicatezza, e ricopri.',fi+120*ms,{anim:'fold',note:'Serve se l\'impasto è uscito dalla macchina poco incordato o se il carico in vasca era basso. Se era già liscio e teso, saltala.'});
     /* niente controlli di notte: si spostano alle 8 del mattino */
     const day=(t,lim)=>{const d=new Date(t),h=d.getHours();if(h>=8&&h<22)return t;const m=new Date(d.getFullYear(),d.getMonth(),d.getDate()+(h>=22?1:0),8,0,0).getTime();return m<lim-3600000?m:t};
     const fr=r.nChk>1?[0.35,0.7]:[0.5];
     fr.forEach((f,i)=>W('chk'+(i+1),'frigo','Controllo in frigo'+(r.nChk>1?' '+(i+1):''),'Guarda le vaschette senza toccare l\'impasto.',day(fi+f*(out-fi),out),{note:'Più che raddoppiato: sposta nel punto più freddo del frigo. Quasi uguale a quando l\'hai messo: è normale, riparte quando esce dal frigo.'}));
-    W('out','forno','Fuori dal frigo','Togli le vaschette e lasciale coperte nel locale a '+t1(r.r2)+' °C.',out,{note:'Resta fuori '+hmin(r.outMin)+' prima di stendere. È pronto quando è circa raddoppiato rispetto a quando l\'hai messo in frigo: se non lo è, aspetta ancora.',ask:true});
+    W('out','forno','Fuori dal frigo','Togli le vaschette e lasciale coperte nel locale a '+t1(r.r2)+' °C.',out,{note:'Registra qui sotto la temperatura della stanza e dell\'impasto, poi ogni ora: la stima del raddoppio si aggiorna. È pronto quando è circa raddoppiato.'});
     W('stendi','forno','Taglia e stendi','Rovescia l\'impasto sul piano infarinato senza sgonfiarlo. Taglia pezzi da circa '+gr(r.g)+', ungi bene la teglia e stendi con i polpastrelli dal centro verso i bordi.',stendi,{anim:'stretch',note:'Se l\'impasto si ritira, lascialo riposare 10 minuti e riprendi. Non usare il mattarello: schiaccia gli alveoli.'});
     X.push({id:'proof',phase:'forno',h:'Lievitazione in teglia',p:r.proofMin+' minuti a '+t1(r.pT)+' °C, teglie coperte. Accendi il forno al massimo (250-270 °C) circa 30 minuti prima di infornare.',dur:r.proofMin,timer:true,anim:'poke',plan:stendi+10*ms,note:'Pronta quando è gonfia e l\'impronta del dito torna su piano piano.'});
-    X.push({id:'inforna',phase:'forno',h:'Condisci e inforna',p:'Condisci e inforna alla massima temperatura. Se la base cuoce piano, teglia sul livello più basso.',dur:0,timer:false,plan:done.out?stendi+(15+r.proofMin)*ms:r.bake});
+    X.push({id:'inforna',phase:'forno',h:'Condisci e inforna',p:'Condisci e inforna alla massima temperatura. Se la base cuoce piano, teglia sul livello più basso.',dur:0,timer:false,plan:F?stendi+(15+r.proofMin)*ms:r.bake});
     const steps=L.concat(X);
     steps.forEach(s=>{if(done[s.id])s.doneAt=done[s.id]});
-    return {r:r,steps:steps,fi:fi,out:out};
+    return {r:r,steps:steps,fi:fi,out:out,F:F,stendiT:r.bake-(r.proofMin+15)*ms};
   }
   function state(P,ses){
     ses=ses||SES;
@@ -604,16 +648,33 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
         (stt.mode==='over'?'<p class="msg good">Tempo scaduto. Quando hai finito, premi Fatto.</p>':'<p class="sub">Non serve aspettare il timer: se hai già finito, premi Fatto.</p>');
       if(s.meas)h+='<label>Temperatura misurata (°C)<input type="number" data-meas step="0.5" inputmode="decimal" value="'+(SES.meas||'')+'" placeholder="es. 21"></label><div id="measmsg" class="stack">'+measHtml(P.r)+'</div>';
     }
-    if(s.ask){
-      const base=stt.mode==='wait'?s.at:Date.now(),ready=base+P.r.outMin*60000,forno=ready+(15+P.r.proofMin)*60000,late=forno-P.r.bake>20*60000;
-      h+='<label>Temperatura della stanza dove lo lasci (°C)<input type="number" data-sk="room2" step="0.5" inputmode="decimal" value="'+SES.inp.room2+'"></label>'+
-        '<p class="msg'+(late?' bad':'')+'">A '+t1(P.r.r2)+' °C il raddoppio è stimato in <b>'+hmin(P.r.outMin)+'</b>: pronto da stendere verso le <b>'+hm(ready)+'</b>, in forno verso le <b>'+hm(forno)+'</b>.'+
-        (late?' È più tardi dell\'infornata prevista ('+hm(P.r.bake)+'): tiralo fuori prima o mettilo in un posto più caldo.':'')+'</p>'+
-        '<p class="sub">Misura la stanza col termometro e scrivila qui: la stima e gli orari successivi si aggiornano. Conta comunque il volume: si stende quando è circa raddoppiato.</p>';
-    }
+    if(P.F)h+=tempCard(P);
     if(s.anim)h+='<div id="how"></div>';
     if(nx)h+='<p class="next">Poi: <b>'+nx.h+'</b>'+(nx.wait?' · '+fmtT(nx.at):'')+'</p>';
     return h;
+  }
+  function fstText(P){
+    const F=P.F,now=Date.now(),l=(SES.log||[]),last=l.length?l[l.length-1].t:0,pc=Math.min(100,Math.round(F.now/F.need*100));
+    let h=(F.out?'<b>Fuori dal frigo</b>, ambiente '+t1(F.amb)+' °C':'<b>In frigo</b> a '+t1(F.amb)+' °C')+' · impasto stimato a <b>'+t1(F.T)+' °C</b><br>Lievitazione stimata al <b>'+pc+'%</b> del raddoppio';
+    if(pc>=100)h+='. Se non stendi adesso, rimettilo in frigo.';
+    else if(F.eta)h+=', pronto verso <b>'+fmtT(F.eta)+'</b>'+(F.late?' (dopo l\'orario previsto, '+hm(F.target)+': tienilo più al caldo)':'')+'.';
+    else h+='. A questa temperatura non raddoppia entro 3 giorni: va tirato fuori.';
+    if(F.out&&last&&now-last>60*60000)h+='<br><b>Ultima misura '+hmin(Math.round((now-last)/60000))+' fa: misura adesso.</b>';
+    return h;
+  }
+  function tempCard(P){
+    const F=P.F;
+    return '<div class="tcard"><div class="lbl">Temperature e lievitazione</div><p id="fst">'+fstText(P)+'</p><div class="grid">'+
+      '<label>Impasto, al centro (°C)<input type="number" id="tD" step="0.5" inputmode="decimal" placeholder="sonda"></label>'+
+      '<label>'+(F.out?'Stanza':'Frigo')+' (°C)<input type="number" id="tA" step="0.5" inputmode="decimal" placeholder="'+t1(F.amb)+'"></label></div>'+
+      '<div class="actions"><button type="button" class="btn small" data-act="logm">Registra misura</button>'+
+      '<button type="button" class="btn ghost small" data-act="'+(F.out?'login':'logout')+'">'+(F.out?'L\'ho rimesso in frigo':'L\'ho tirato fuori dal frigo')+'</button></div>'+
+      '<p class="sub">'+(F.out?'Fuori dal frigo misura impasto e stanza ogni ora: l\'app te lo ricorda.':'A ogni controllo scrivi la temperatura del frigo. Se tiri fuori l\'impasto, anche solo per qualche ora, segnalo qui.')+'</p></div>';
+  }
+  function logHtml(){
+    const l=(SES.log||[]).slice().sort((a,b)=>b.t-a.t);
+    if(!l.length)return '';
+    return '<h3 class="grp">Misure registrate</h3><ul class="rules">'+l.map(e=>'<li><b>'+fmtT(e.t)+'</b> · '+(e.k==='out'?'tirato fuori dal frigo':e.k==='in'?'messo in frigo':'misura')+(e.dough!=null?' · impasto '+t1(e.dough)+' °C':'')+(e.amb!=null?' · ambiente '+t1(e.amb)+' °C':'')+'</li>').join('')+'</ul>';
   }
   function sumHtml(P,stt){
     const tabs=[['steps','Passaggi'],['dosi','Dosi'],['temp','Temperature'],['altro','Altro']];
@@ -632,7 +693,7 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
     }else if(sumTab==='dosi'){
       h+='<h2>'+r.P.name+'</h2>'+doseHtml(r)+rulesHtml(r);
     }else if(sumTab==='temp'){
-      h+=waterHtml(r)+(SES.meas?'<p class="msg">Impasto misurato a fine lavorazione: <b>'+t1(+SES.meas)+' °C</b>.</p>':'')+laterHtml(r);
+      h+=(P.F?'<div class="tcard"><div class="lbl">Lievitazione</div><p>'+fstText(P)+'</p></div>'+logHtml():'')+waterHtml(r)+(SES.meas?'<p class="msg">Impasto misurato a fine lavorazione: <b>'+t1(+SES.meas)+' °C</b>.</p>':'')+laterHtml(r);
     }else{
       const i=SES.inp;
       h+='<h3 class="grp">Giorno del forno</h3><label>Ora di infornata<input type="datetime-local" data-sk="bake" value="'+i.bake+'"></label><div class="grid">'+
@@ -688,6 +749,7 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
   }
   const sigOf=stt=>view+'|'+sumTab+'|'+(stt.s?stt.s.id:'end')+'|'+stt.mode;
   function paint(stt){
+    const fs=$('fst');if(fs&&SES){const P=build(SES.inp,SES.t0,SES);if(P.F)fs.innerHTML=fstText(P)}
     const cd=$('cd');if(!cd)return;
     const now=Date.now();
     cd.textContent=stt.mode==='wait'?'tra '+left(stt.s.at-now):stt.mode==='run'?left(stt.end-now):'00:00';
@@ -714,6 +776,7 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
         if(stt.mode==='over'&&!ses.fired[s.id]){ses.fired[s.id]=1;saveSes();if(now-stt.end<10*60000)notify(tag+'tempo scaduto, '+s.h,'Quando hai finito, premi Fatto.')}
         if(s.wait&&now>=s.at&&!ses.fired['at:'+s.id]){ses.fired['at:'+s.id]=1;saveSes();if(now-s.at<3*60000&&now-ses.cur.since>5000)notify(tag+'ora '+s.h,s.p)}
       }
+      if(isOut(ses)&&stt.mode!=='end'){const l=ses.log,last=l[l.length-1].t;if(now-last>60*60000){const k='tm:'+last+':'+Math.floor((now-last)/3600000);if(!ses.fired[k]){ses.fired[k]=1;saveSes();notify(tag+'misura la temperatura','Impasto fuori dal frigo: misura impasto e stanza e registrali.')}}}
       if(ses===SES)open=stt;
     });
     if(SES&&open){if(sigOf(open)!==lastSig)render();else paint(open)}
@@ -723,7 +786,8 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});
 
   /* ---- Azioni ---- */
-  function complete(id){SES.done[id]=Date.now();saveSes();render()}
+  function complete(id){SES.done[id]=Date.now();if(id==='out'&&!isOut(SES))addLog(SES,{k:'out',amb:num(SES.inp.room2,18)});saveSes();render()}
+  function readT(){const d=$('tD'),a=$('tA'),e={};if(d&&d.value!==''&&isFinite(+d.value))e.dough=+d.value;if(a&&a.value!==''&&isFinite(+a.value))e.amb=+a.value;return e}
   document.addEventListener('click',e=>{
     const t=e.target.closest('[data-act],[data-tab],[data-toggle],[data-mixer],[data-open]');if(!t)return;
     const a=t.dataset.act;
@@ -746,6 +810,13 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
     else if(a==='retimer'){SES.cur.since=Date.now();const stt=state(build(SES.inp,SES.t0,SES));if(stt.s)delete SES.fired[stt.s.id];saveSes();ensureAudio();lastSig='';tick()}
     else if(a==='sum'){view='sum';render();$('view').scrollTop=0}
     else if(a==='back'){view='now';confirmEnd=false;render();$('view').scrollTop=0}
+    else if(a==='logm'||a==='logout'||a==='login'){
+      const e=readT();
+      if(a==='logm'){if(e.dough==null&&e.amb==null)return;e.k='m'}
+      else{e.k=a==='logout'?'out':'in';if(e.amb==null)e.amb=a==='logout'?num(SES.inp.room2,18):num(SES.inp.fridge,4)}
+      if(e.amb!=null){if(e.k==='out'||(e.k==='m'&&isOut(SES)))SES.inp.room2=e.amb;else SES.inp.fridge=e.amb}
+      addLog(SES,e);render();
+    }
     else if(a==='notif')askNotif();
     else if(a==='bell'){if(('Notification' in window)&&Notification.permission==='default')askNotif();else{view='sum';sumTab='altro';render();$('view').scrollTop=0}}
     else if(a==='testn')notify('Notifica di prova','Se la vedi e la senti, gli avvisi funzionano.');
@@ -805,6 +876,8 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
   ALL=ALL.filter(x=>x&&x.inp&&x.done&&PRODUCTS[x.inp.prod]);
   /* preparazioni iniziate prima del 16/11: il lievito pesato era quello della vecchia formula (base 0,07%) */
   ALL.forEach(x=>{if(x.fz&&x.t0<Date.parse('2026-11-15T23:30:00Z')&&x.fz.yPct>0.15){x.fz.yPct=x.fz.yPct*0.07/0.25;x.fz.lv=x.fz.fl*x.fz.yPct/100}});
+  /* impasto del 15/11: frigo a 2,5 °C, fuori dalle 9:17 alle 13:35 del 16/11, impasto a 15 °C alle 13:32 */
+  ALL.forEach(x=>{if(x.t0<Date.parse('2026-11-15T23:30:00Z')&&!x.log){x.inp.fridge=2.5;x.inp.room2=20;delete x.inp.outH}if(x.t0<Date.parse('2026-11-15T23:30:00Z')&&!x.log)x.log=[{t:x.t0+81*60000,k:'in',amb:2.5},{t:Date.parse('2026-11-16T08:17:00Z'),k:'out',amb:20.5},{t:Date.parse('2026-11-16T10:45:00Z'),k:'m',amb:19.2},{t:Date.parse('2026-11-16T12:32:00Z'),k:'m',dough:15,amb:19.2},{t:Date.parse('2026-11-16T12:35:00Z'),k:'in',amb:2.5}]});
   saveSes();
   SES=ALL.length===1?ALL[0]:null;screen=ALL.length?'home':'wiz';
   if(!PRODUCTS[S.prod])S.prod='teglia-classica';
