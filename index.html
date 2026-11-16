@@ -112,6 +112,12 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
 .switch input{width:22px;height:22px;accent-color:var(--ember)}
 .bell{font:inherit;font-size:.8rem;font-weight:700;border-radius:999px;padding:5px 10px;border:1.5px solid var(--tomato);color:var(--tomato);background:#fbe9e5;cursor:pointer;white-space:nowrap}
 .bell.on{border-color:var(--basil);color:var(--basil);background:#e7f3e6}
+.btn.nav{flex:none;padding:14px 12px;font-size:.95rem}
+.job{font:inherit;color:var(--ink);text-align:left;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;cursor:pointer}
+.job b{font-family:var(--display);font-size:1.4rem;font-weight:800;line-height:1.05}
+.job .pbar{flex:none}
+.job .st{font-weight:600;font-variant-numeric:tabular-nums}
+.job .st.hot{color:var(--ember)}
 .dots{display:flex;gap:5px}
 .dots i{width:8px;height:8px;border-radius:50%;background:#d9d2c8}
 .dots i.on{background:var(--ember)}
@@ -211,11 +217,14 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
   /* ---- Stato ---- */
   const DEF={prod:'teglia-classica',n:12,fmt:'60',g:'',idr:'',mixer:'mono',cap:30,room:16,flourT:'',target:21,fric:'',fridge:4,room2:18,proofT:24,start:'',bake:''};
   let S=Object.assign({},DEF,store.get('lv-set')||{});
-  let SES=store.get('lv-ses');
+  /* ALL = tutte le lavorazioni in corso; SES = quella aperta sullo schermo (o null) */
+  let ALL=store.get('lv-all')||[];
+  if(!ALL.length&&!store.get('lv-all')){const o1=store.get('lv-ses');if(o1&&o1.inp)ALL=[o1]}
+  let SES=null,screen='home';
   let view='now',sumTab='steps',wiz=0,lastSig='',confirmEnd=false;
   let awakeOn=store.get('lv-awake')!==0;
   const saveS=()=>store.set('lv-set',S);
-  const saveSes=()=>store.set('lv-ses',SES);
+  const saveSes=()=>store.set('lv-all',ALL);
 
   /* ---- Calcolo ---- */
   function compute(inp,t0,yUsed){
@@ -284,14 +293,15 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
     steps.forEach(s=>{if(done[s.id])s.doneAt=done[s.id]});
     return {r:r,steps:steps,fi:fi,out:out};
   }
-  function state(P){
-    const now=Date.now(),idx=P.steps.findIndex(s=>!SES.done[s.id]);
+  function state(P,ses){
+    ses=ses||SES;
+    const now=Date.now(),idx=P.steps.findIndex(x=>!ses.done[x.id]);
     if(idx<0)return {idx:-1,mode:'end'};
     const s=P.steps[idx];
-    if(!SES.cur||SES.cur.id!==s.id){SES.cur={id:s.id,since:now};saveSes()}
+    if(!ses.cur||ses.cur.id!==s.id){ses.cur={id:s.id,since:now};saveSes()}
     let mode='do',end=0;
     if(s.wait&&now<s.at)mode='wait';
-    else if(s.timer&&s.dur){end=(s.wait?Math.max(SES.cur.since,s.at):SES.cur.since)+s.dur*60000;mode=now<end?'run':'over'}
+    else if(s.timer&&s.dur){end=(s.wait?Math.max(ses.cur.since,s.at):ses.cur.since)+s.dur*60000;mode=now<end?'run':'over'}
     return {idx:idx,s:s,mode:mode,end:end};
   }
 
@@ -643,11 +653,21 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
 
   function render(){
     const top=$('top'),v=$('view'),bar=$('bar');
+    if(!SES&&screen==='home'&&ALL.length){
+      top.innerHTML='<span class="brand">Lievitati Scacchiera</span>';
+      v.innerHTML='<h1>Lavorazioni in corso</h1><ul class="list">'+ALL.map((ses,i)=>{
+        const P=build(ses.inp,ses.t0,ses),n=P.steps.length,dn=P.steps.filter(x=>ses.done[x.id]).length,pc=Math.round(dn/n*100);
+        return '<li><button type="button" class="job" data-open="'+i+'"><b>'+P.r.P.name+'</b><span class="sub">'+P.r.n+' teglie · '+(P.r.total/1000).toFixed(1).replace('.',',')+' kg · iniziata '+fmtT(ses.t0)+'</span>'+
+          '<div class="pbar'+(pc===100?' full':'')+'"><div style="width:'+pc+'%"></div></div><span class="st" id="hc'+i+'"></span></button></li>';
+      }).join('')+'</ul><p class="sub">Tocca una lavorazione per aprirla. Gli avvisi arrivano per tutte, anche da questa schermata.</p>';
+      bar.innerHTML='<button type="button" class="btn big" data-act="new">Nuova lavorazione</button>';
+      lastSig=homeSig();paintHome();return;
+    }
     if(!SES){
       const t0=startMs(),r=compute(S,t0),m=timeMsg(r,t0);
       top.innerHTML='<span class="brand">Lievitati Scacchiera</span><span class="dots">'+WZ.map((w,i)=>'<i'+(i<=wiz?' class="on"':'')+'></i>').join('')+'</span>';
       v.innerHTML=WZ[wiz].html(r,t0);derived();
-      bar.innerHTML=(wiz>0?'<button type="button" class="btn ghost" data-act="prev">Indietro</button>':'')+
+      bar.innerHTML=(wiz>0?'<button type="button" class="btn ghost" data-act="prev">Indietro</button>':ALL.length?'<button type="button" class="btn ghost" data-act="home">Annulla</button>':'')+
         (wiz<WZ.length-1?'<button type="button" class="btn big" data-act="next">Avanti</button>':'<button type="button" class="btn big" data-act="start"'+(m.block?' disabled':'')+'>Inizia la preparazione</button>');
       if($('art'))try{drawArt()}catch(e){}
       lastSig='wiz'+wiz;return;
@@ -656,11 +676,11 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
     top.innerHTML='<div class="pbar'+(pc===100?' full':'')+'" role="progressbar" aria-label="Completamento" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pc+'"><div style="width:'+pc+'%"></div></div><span class="cnt">'+dn+' di '+n+'</span><button type="button" class="bell'+(notifOn()?' on':'')+'" data-act="bell">'+(notifOn()?'Avvisi attivi':'Avvisi spenti')+'</button>';
     if(view==='sum'){
       v.innerHTML=sumHtml(P,stt);
-      bar.innerHTML='<button type="button" class="btn big" data-act="back">Torna a cosa fare adesso</button>';
+      bar.innerHTML='<button type="button" class="btn ghost nav" data-act="home">Lavorazioni</button><button type="button" class="btn big" data-act="back">Torna a cosa fare adesso</button>';
     }else{
       v.innerHTML=nowHtml(P,stt);
       if(stt.s&&stt.s.anim&&$('how'))addHowto($('how'),stt.s.anim,stt.s.id);
-      bar.innerHTML='<button type="button" class="btn ghost" data-act="sum">Riepilogo</button>'+
+      bar.innerHTML='<button type="button" class="btn ghost nav" data-act="home">Lavorazioni</button><button type="button" class="btn ghost nav" data-act="sum">Riepilogo</button>'+
         (stt.mode==='end'?'<button type="button" class="btn big" data-act="endnow">Termina</button>':'<button type="button" class="btn big" data-act="done">'+(stt.mode==='wait'?'Già fatto':'Fatto')+'</button>');
     }
     lastSig=sigOf(stt);paint(stt);
@@ -672,16 +692,32 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
     const now=Date.now();
     cd.textContent=stt.mode==='wait'?'tra '+left(stt.s.at-now):stt.mode==='run'?left(stt.end-now):'00:00';
   }
+  function stText(P,stt){
+    const now=Date.now();
+    if(stt.mode==='end')return 'Finita';
+    if(stt.mode==='wait')return 'In attesa: '+stt.s.h+' · tra '+left(stt.s.at-now);
+    if(stt.mode==='run')return 'Adesso: '+stt.s.h+' · '+left(stt.end-now);
+    if(stt.mode==='over')return 'Tempo scaduto: '+stt.s.h;
+    return 'Da fare adesso: '+stt.s.h;
+  }
+  const homeSig=()=>'home|'+ALL.map(ses=>{const st=state(build(ses.inp,ses.t0,ses),ses);return ses.t0+(st.s?st.s.id:'end')+st.mode}).join(',');
+  function paintHome(){
+    ALL.forEach((ses,i)=>{const el=$('hc'+i);if(!el)return;const P=build(ses.inp,ses.t0,ses),st=state(P,ses);el.textContent=stText(P,st);el.className='st'+(st.mode==='over'||st.mode==='do'?' hot':'')});
+  }
   function tick(){
-    if(!SES)return;
-    const P=build(SES.inp,SES.t0,SES),stt=state(P),now=Date.now();
-    SES.fired=SES.fired||{};
-    if(stt.s){
-      const s=stt.s;
-      if(stt.mode==='over'&&!SES.fired[s.id]){SES.fired[s.id]=1;saveSes();if(now-stt.end<10*60000)notify('Tempo scaduto: '+s.h,'Quando hai finito, premi Fatto.')}
-      if(s.wait&&now>=s.at&&!SES.fired['at:'+s.id]){SES.fired['at:'+s.id]=1;saveSes();if(now-s.at<3*60000&&now-SES.cur.since>5000)notify('Ora: '+s.h,s.p)}
-    }
-    if(sigOf(stt)!==lastSig)render();else paint(stt);
+    const now=Date.now();let open=null;
+    ALL.forEach(ses=>{
+      const P=build(ses.inp,ses.t0,ses),stt=state(P,ses),tag=ALL.length>1?P.r.P.name+': ':'';
+      ses.fired=ses.fired||{};
+      if(stt.s){
+        const s=stt.s;
+        if(stt.mode==='over'&&!ses.fired[s.id]){ses.fired[s.id]=1;saveSes();if(now-stt.end<10*60000)notify(tag+'tempo scaduto, '+s.h,'Quando hai finito, premi Fatto.')}
+        if(s.wait&&now>=s.at&&!ses.fired['at:'+s.id]){ses.fired['at:'+s.id]=1;saveSes();if(now-s.at<3*60000&&now-ses.cur.since>5000)notify(tag+'ora '+s.h,s.p)}
+      }
+      if(ses===SES)open=stt;
+    });
+    if(SES&&open){if(sigOf(open)!==lastSig)render();else paint(open)}
+    else if(!SES&&screen==='home'&&ALL.length){if(homeSig()!==lastSig)render();else paintHome()}
   }
   setInterval(tick,1000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});
@@ -689,18 +725,21 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
   /* ---- Azioni ---- */
   function complete(id){SES.done[id]=Date.now();saveSes();render()}
   document.addEventListener('click',e=>{
-    const t=e.target.closest('[data-act],[data-tab],[data-toggle],[data-mixer]');if(!t)return;
+    const t=e.target.closest('[data-act],[data-tab],[data-toggle],[data-mixer],[data-open]');if(!t)return;
     const a=t.dataset.act;
+    if(t.dataset.open){SES=ALL[+t.dataset.open]||null;view='now';confirmEnd=false;render();$('view').scrollTop=0;return}
     if(t.dataset.mixer){S.mixer=t.dataset.mixer;S.cap=MIXERS[S.mixer].cap;S.fric='';saveS();render();return}
     if(t.dataset.tab){sumTab=t.dataset.tab;confirmEnd=false;render();$('view').scrollTop=0;return}
     if(t.dataset.toggle){const id=t.dataset.toggle;if(SES.done[id])delete SES.done[id];else SES.done[id]=Date.now();saveSes();render();return}
-    if(a==='next'){wiz=Math.min(WZ.length-1,wiz+1);render();$('view').scrollTop=0}
+    if(a==='home'){SES=null;screen='home';view='now';confirmEnd=false;releaseAwake();render();$('view').scrollTop=0}
+    else if(a==='new'){screen='wiz';wiz=0;fixDates();render();$('view').scrollTop=0}
+    else if(a==='next'){wiz=Math.min(WZ.length-1,wiz+1);render();$('view').scrollTop=0}
     else if(a==='prev'){wiz=Math.max(0,wiz-1);render();$('view').scrollTop=0}
     else if(a==='startnow'){S.start=toInput(new Date());saveS();render()}
     else if(a==='start'){
       const t0=Date.now(),inp=Object.assign({},S),r=compute(inp,t0),fz={};
       FZ.forEach(k=>{fz[k]=r[k]});
-      SES={inp:inp,t0:t0,done:{},cur:null,fired:{},meas:'',fz:fz};saveSes();
+      SES={inp:inp,t0:t0,done:{},cur:null,fired:{},meas:'',fz:fz};ALL.push(SES);saveSes();
       view='now';sumTab='steps';ensureAudio();askNotif();render();$('view').scrollTop=0;
     }
     else if(a==='done'){const stt=state(build(SES.inp,SES.t0,SES));if(stt.s)complete(stt.s.id);$('view').scrollTop=0}
@@ -715,7 +754,7 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
     else if(a==='end'){if(!confirmEnd){confirmEnd=true;render()}else endSes()}
     else if(a==='endnow')endSes();
   });
-  function endSes(){SES=null;saveSes();confirmEnd=false;wiz=0;view='now';releaseAwake();fixDates();render()}
+  function endSes(){ALL=ALL.filter(x=>x!==SES);SES=null;saveSes();confirmEnd=false;wiz=0;view='now';screen=ALL.length?'home':'wiz';releaseAwake();fixDates();render()}
   $('view').addEventListener('input',e=>{
     const el=e.target;
     if(el.dataset.k&&!SES){
@@ -756,16 +795,18 @@ details p{margin-top:6px;color:var(--muted);font-size:.95rem}
       if(o.started&&isFinite(t0)&&isFinite(b)&&b>Date.now()&&Date.now()-t0<4*86400000){
         const inp=Object.assign({},S),r=compute(inp,t0),fz={};
         FZ.forEach(k=>{fz[k]=r[k]});
-        SES={inp:inp,t0:t0,done:{},cur:null,fired:{},meas:o.meas||'',fz:fz};
+        SES={inp:inp,t0:t0,done:{},cur:null,fired:{},meas:o.meas||'',fz:fz};ALL.push(SES);
         const tf=Math.min(Date.now(),t0+80*60000);
         build(inp,t0,SES).steps.forEach(s=>{if(s.phase==='impasto'||s.id==='fold')SES.done[s.id]=tf});
         saveSes();
       }
     }
   }
-  if(SES&&(!SES.inp||!SES.done||!PRODUCTS[SES.inp.prod]))SES=null;
+  ALL=ALL.filter(x=>x&&x.inp&&x.done&&PRODUCTS[x.inp.prod]);
   /* preparazioni iniziate prima del 16/11: il lievito pesato era quello della vecchia formula (base 0,07%) */
-  if(SES&&SES.fz&&SES.t0<Date.parse('2026-11-15T23:30:00Z')&&SES.fz.yPct>0.15){SES.fz.yPct=SES.fz.yPct*0.07/0.25;SES.fz.lv=SES.fz.fl*SES.fz.yPct/100;saveSes()}
+  ALL.forEach(x=>{if(x.fz&&x.t0<Date.parse('2026-11-15T23:30:00Z')&&x.fz.yPct>0.15){x.fz.yPct=x.fz.yPct*0.07/0.25;x.fz.lv=x.fz.fl*x.fz.yPct/100}});
+  saveSes();
+  SES=ALL.length===1?ALL[0]:null;screen=ALL.length?'home':'wiz';
   if(!PRODUCTS[S.prod])S.prod='teglia-classica';
   if(!MIXERS[S.mixer])S.mixer='mono';
   fixDates();
