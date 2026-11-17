@@ -253,13 +253,14 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   const saveS=()=>store.set('lv-set',S);
   const saveSes=()=>store.set('lv-all',ALL);
 
-  const VERSION='17/11 10:20';
+  const VERSION='17/11 11:25';
   const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
   /* ---- I tuoi posti: dove sta l'impasto, con la temperatura tipica. c = posto freddo (frigo, cella) ---- */
-  const PL_DEF=[{n:'Frigo',t:2.5,c:1},{n:'Cella',t:1,c:1},{n:'Laboratorio',t:15},{n:'Camera',t:20},{n:'Vicino al forno',t:25}];
+  const PL_DEF=[{n:'Frigo',t:2.5,c:1},{n:'Cella',t:1,c:1},{n:'Laboratorio',t:15},{n:'Camera',t:20},{n:'Cella di lievitazione',t:24},{n:'Vicino al forno',t:25}];
   let PLACES=store.get('lv-places')||PL_DEF.slice();
   const savePl=()=>store.set('lv-places',PLACES);
+  if(!PLACES.some(p=>/lievitazione/i.test(p.n))){PLACES.splice(Math.min(4,PLACES.length),0,{n:'Cella di lievitazione',t:24});savePl()}
   let selPlace=null;
 
   /* ---- Domande rapide a ogni fase. Il secondo valore misura la forza della farina (-1 debole, +1 forte) ---- */
