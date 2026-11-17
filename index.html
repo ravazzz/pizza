@@ -556,12 +556,47 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   function ez(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2}
   function rrect(x,X,Y,W,H,R){x.beginPath();x.moveTo(X+R,Y);x.arcTo(X+W,Y,X+W,Y+H,R);x.arcTo(X+W,Y+H,X,Y+H,R);x.arcTo(X,Y+H,X,Y,R);x.arcTo(X,Y,X+W,Y,R);x.closePath()}
   function bg(x){x.fillStyle='#faf7f2';x.fillRect(0,0,400,300)}
+  /* Mano vista dal dorso: dita verso +x, polpastrelli a circa +30, polso verso -x.
+     Si disegna in tre passate: contorno con ombra, riempimento senza giunture, dettagli (unghie, nocche, tendini). */
   function handTop(x,X,Y,ang,sc){
     x.save();x.translate(X,Y);x.rotate(ang);x.scale(sc||1,sc||1);
-    x.fillStyle=SKIN;x.strokeStyle=SKIN_D;x.lineWidth=1.5;
-    for(var i=0;i<4;i++){rrect(x,0,-16+i*8.5,30-Math.abs(i-1.5)*4,7.5,3.7);x.fill();x.stroke()}
-    x.beginPath();x.ellipse(-16,0,22,19,0,0,7);x.fill();x.stroke();
-    rrect(x,-14,15,22,8,4);x.fill();x.stroke();
+    var F=[[-11,23,-0.16,6.4],[-3.6,27.5,-0.05,7],[3.8,26,0.05,6.8],[10.6,20.5,0.16,5.9]];
+    function fingerPath(f){
+      var L=f[1],w=f[3],t=w*0.43;
+      x.save();x.translate(1,f[0]);x.rotate(f[2]);
+      x.beginPath();x.moveTo(-5,-w/2);x.quadraticCurveTo(L*0.5,-w*0.5,L-t,-t);x.arc(L-t,0,t,-Math.PI/2,Math.PI/2);x.quadraticCurveTo(L*0.5,w*0.5,-5,w/2);x.closePath();
+      x.restore();
+    }
+    function thumbPath(){
+      x.save();x.translate(-12,12);x.rotate(0.55);
+      x.beginPath();x.moveTo(-6,-6);x.quadraticCurveTo(9,-5.4,18,-3.6);x.arc(18,0,3.6,-Math.PI/2,Math.PI/2);x.quadraticCurveTo(9,5.4,-6,6);x.closePath();
+      x.restore();
+    }
+    function palmPath(){
+      x.beginPath();x.moveTo(-36,-12);x.bezierCurveTo(-24,-15.5,-10,-17.5,1,-15);x.quadraticCurveTo(5.5,-6,3.5,1);x.quadraticCurveTo(5.5,9,1,14.5);
+      x.bezierCurveTo(-10,17,-24,16,-36,12);x.quadraticCurveTo(-40,0,-36,-12);x.closePath();
+    }
+    function all(fn){thumbPath();fn();palmPath();fn();F.forEach(function(f){fingerPath(f);fn()})}
+    x.lineJoin='round';x.lineCap='round';
+    x.save();x.shadowColor='rgba(70,35,10,.30)';x.shadowBlur=8;x.shadowOffsetX=2;x.shadowOffsetY=4;
+    x.strokeStyle='#b07650';x.lineWidth=2.4;all(function(){x.stroke()});
+    x.restore();
+    var g=x.createLinearGradient(0,-18,0,18);g.addColorStop(0,'#dca07a');g.addColorStop(0.45,'#f0c4a2');g.addColorStop(1,'#d6966d');
+    x.fillStyle=g;all(function(){x.fill()});
+    F.forEach(function(f){
+      var L=f[1],w=f[3];
+      x.save();x.translate(1,f[0]);x.rotate(f[2]);
+      x.fillStyle='rgba(246,214,200,.75)';x.strokeStyle='rgba(176,118,80,.45)';x.lineWidth=0.7;
+      x.beginPath();x.ellipse(L-w*0.62,0,w*0.42,w*0.27,0,0,7);x.fill();x.stroke();
+      x.strokeStyle='rgba(150,95,60,.35)';x.lineWidth=0.8;
+      [0.42,0.68].forEach(function(k){x.beginPath();x.moveTo(L*k-0.6,-w*0.22);x.quadraticCurveTo(L*k+0.7,0,L*k-0.6,w*0.22);x.stroke()});
+      x.fillStyle='rgba(255,255,255,.16)';x.beginPath();x.ellipse(L*0.45,-w*0.16,L*0.26,w*0.1,0,0,7);x.fill();
+      x.restore();
+    });
+    x.save();x.translate(-12,12);x.rotate(0.55);x.fillStyle='rgba(246,214,200,.75)';x.strokeStyle='rgba(176,118,80,.45)';x.lineWidth=0.7;x.beginPath();x.ellipse(17,0,2.8,2,0,0,7);x.fill();x.stroke();x.restore();
+    x.fillStyle='rgba(255,236,220,.35)';F.forEach(function(f){x.beginPath();x.ellipse(0.5,f[0],2.2,2.8,0,0,7);x.fill()});
+    x.strokeStyle='rgba(150,95,60,.16)';x.lineWidth=1.3;
+    F.forEach(function(f){x.beginPath();x.moveTo(-26,f[0]*0.55);x.quadraticCurveTo(-12,f[0]*0.8,-2,f[0]);x.stroke()});
     x.restore();
   }
   var ANIMS={
@@ -604,8 +639,8 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
       var press=sg(p,.12,.45),n=Math.floor(press*D.length);
       x.fillStyle='rgba(176,128,60,.38)';
       for(i=0;i<n;i++){var q=at(D[i][0],D[i][1]);x.beginPath();x.ellipse(q[0],q[1],5,7,0,0,7);x.fill()}
-      if(p>=.12&&p<.45&&n<D.length){var f=at(D[n][0],D[n][1]),bump=1-.12*Math.abs(Math.sin(press*D.length*Math.PI));handTop(x,f[0],f[1]+30,-Math.PI/2,bump)}
-      if(p>=.47&&p<.77){var ci=clamp(Math.floor((p-.47)/.075),0,3),pt=pts[ci],ang=Math.atan2(cy-pt[1],cx-pt[0]);handTop(x,pt[0]-Math.cos(ang)*22,pt[1]-Math.sin(ang)*22,ang,1)}
+      if(p>=.12&&p<.45&&n<D.length){var f=at(D[n][0],D[n][1]),bump=1-.12*Math.abs(Math.sin(press*D.length*Math.PI));handTop(x,f[0],f[1]+34,-Math.PI/2,1.2*bump)}
+      if(p>=.47&&p<.77){var ci=clamp(Math.floor((p-.47)/.075),0,3),pt=pts[ci],ang=Math.atan2(cy-pt[1],cx-pt[0]);handTop(x,pt[0]-Math.cos(ang)*26,pt[1]-Math.sin(ang)*26,ang,1.2)}
       return p<.12?'Ungi bene la teglia e appoggia l\'impasto al centro':p<.46?'Premi con i polpastrelli dal centro verso i bordi, come sul pianoforte':p<.78?'Tira gli angoli fino agli spigoli della teglia':'Se si ritira, lascia riposare 10 minuti e riprova';
     },
     poke:function(x,t){
