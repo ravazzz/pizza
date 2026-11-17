@@ -141,6 +141,8 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
 .plrow input[type=number]{padding:10px}
 .mini{font-size:.82rem;color:var(--muted);display:flex;align-items:center;gap:4px}
 .x{font:inherit;font-weight:700;border:0;background:transparent;color:var(--tomato);font-size:1.2rem;cursor:pointer;padding:6px}
+.upd{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);z-index:20;font:inherit;font-weight:700;border:0;border-radius:999px;padding:12px 18px;background:var(--basil);color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer;max-width:92vw}
+.ver{font-size:.8rem;color:var(--muted);text-align:center}
 .dots{display:flex;gap:5px}
 .dots i{width:8px;height:8px;border-radius:50%;background:#d9d2c8}
 .dots i.on{background:var(--ember)}
@@ -251,6 +253,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   const saveS=()=>store.set('lv-set',S);
   const saveSes=()=>store.set('lv-all',ALL);
 
+  const VERSION='17/11 10:20';
   const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
   /* ---- I tuoi posti: dove sta l'impasto, con la temperatura tipica. c = posto freddo (frigo, cella) ---- */
@@ -952,7 +955,8 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
       }).join('')+'</ul>':'<p class="sub">Nessuna lavorazione in corso.</p>')+fl+
         '<h3 class="grp">Altro</h3><div class="actions"><button type="button" class="btn ghost small" data-act="hist">Storico ('+HIST.length+')</button><button type="button" class="btn ghost small" data-act="places">Posti e temperature</button></div>'+
         '<div class="actions"><button type="button" class="btn ghost small" data-act="backup">Salva copia</button><button type="button" class="btn ghost small" data-act="restore">Carica copia</button></div>'+
-        '<p class="sub">Dati e foto restano solo in questo telefono. Ogni tanto salva una copia e tienila in un posto sicuro (Drive, PC).</p>'+(bkMsg?'<p class="msg">'+bkMsg+'</p>':'');
+        '<p class="sub">Dati e foto restano solo in questo telefono. Ogni tanto salva una copia e tienila in un posto sicuro (Drive, PC).</p>'+(bkMsg?'<p class="msg">'+bkMsg+'</p>':'')+
+        '<p class="ver">Versione '+VERSION+' · <button type="button" class="btn ghost small" data-act="reload" style="display:inline-block">Ricarica</button></p>';
       bar.innerHTML='<button type="button" class="btn big" data-act="new">Nuova lavorazione</button>';
       lastSig=homeSig();paintHome();return;
     }
@@ -1016,6 +1020,16 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     else if(!SES&&screen==='home'){if(homeSig()!==lastSig)render();else paintHome()}
   }
   setInterval(tick,1000);
+  /* controlla se su GitHub c'è una versione più nuova e lo dice con un tasto verde */
+  function checkUpd(){
+    if(location.protocol!=='https:')return;
+    try{fetch('./?u='+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(t=>{
+      const m=t.match(/const VERSION='([^']+)'/);
+      if(m&&m[1]!==VERSION&&!$('updb')){const b=document.createElement('button');b.id='updb';b.className='upd';b.dataset.act='upd';b.textContent='Nuova versione '+m[1]+': tocca per aggiornare';document.body.appendChild(b)}
+    }).catch(()=>{})}catch(e){}
+  }
+  checkUpd();setInterval(checkUpd,15*60000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpd()});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});
 
   /* ---- Azioni ---- */
@@ -1069,6 +1083,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     else if(a==='pladd'){PLACES.push({n:'Nuovo posto',t:20});savePl();render()}
     else if(a==='pldel'){PLACES.splice(+t.dataset.i,1);savePl();render()}
     else if(a==='backup')backup();
+    else if(a==='reload'||a==='upd'){location.reload()}
     else if(a==='restore'){$('loadb').value='';$('loadb').click()}
     else if(a==='notif')askNotif();
     else if(a==='bell'){if(('Notification' in window)&&Notification.permission==='default')askNotif();else{view='sum';sumTab='altro';render();$('view').scrollTop=0}}
