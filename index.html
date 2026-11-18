@@ -262,7 +262,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   const saveS=()=>store.set('lv-set',S);
   const saveSes=()=>store.set('lv-all',ALL);
 
-  const VERSION='18/11 9:45';
+  const VERSION='18/11 9:55';
   const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
   /* ---- I tuoi posti: dove sta l'impasto, con la temperatura tipica. c = posto freddo (frigo, cella) ---- */
@@ -889,8 +889,10 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
         CRIT.map(([c,l])=>'<div class="rate"><span>'+l+'</span><div class="opts">'+[1,2,3,4,5].map(v=>'<button type="button" class="opt'+(J[c]===v?' on':'')+'" data-rate="'+k+'|'+c+'|'+v+'">'+v+'</button>').join('')+'</div></div>').join('')+
         '<label>Commento<textarea data-com="'+k+'" rows="3" placeholder="Cosa ti è piaciuto, cosa cambieresti">'+esc(J.com||'')+'</textarea></label>'+photoBlock('fine-'+k)+'</div>'}).join('');
   }
+  const abortBtn=()=>'<div class="stack" style="margin-top:8px"><button type="button" class="btn ghost small danger" data-act="abort">'+(confirmAbort?'Conferma: elimina questa lavorazione senza salvarla':'Interrompi lavorazione')+'</button>'+(confirmAbort?'<p class="sub">Si cancellano passaggi, misure e foto di questa lavorazione. Tocca di nuovo per confermare, oppure Riepilogo per annullare.</p>':'')+'</div>';
+  let confirmAbort=false;
   function nowHtml(P,stt){
-    if(stt.mode==='end')return judgeHtml(P);
+    if(stt.mode==='end')return judgeHtml(P)+abortBtn();
     const s=stt.s,n=P.steps.length,nx=P.steps[stt.idx+1];let h;
     if(stt.mode==='wait'){
       h='<div class="lbl">In attesa · niente da fare adesso</div><div class="cd" id="cd"></div><p class="sub">Prossimo passaggio: '+fmtT(s.at)+'</p><h1>'+s.h+'</h1><p class="txt">'+s.p+'</p>'+(s.note?'<p class="note">'+s.note+'</p>':'');
@@ -910,6 +912,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     if(s.anim)h+='<div id="how"></div>';
     h+='<div class="stack">'+photoBlock(s.id)+'</div>';
     if(nx)h+='<p class="next">Poi: <b>'+nx.h+'</b>'+(nx.wait?' · '+fmtT(nx.at):'')+'</p>';
+    h+=abortBtn();
     return h;
   }
   function fstText(P){
@@ -1161,6 +1164,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     if(t.dataset.mixer){S.mixer=t.dataset.mixer;S.cap=MIXERS[S.mixer].cap;S.fric='';saveS();render();return}
     if(t.dataset.tab){sumTab=t.dataset.tab;confirmEnd=false;render();$('view').scrollTop=0;return}
     if(t.dataset.toggle){const id=t.dataset.toggle;if(SES.done[id])delete SES.done[id];else SES.done[id]=Date.now();saveSes();render();return}
+    if(a!=='abort')confirmAbort=false;
     if(a==='home'){SES=null;screen='home';bkMsg='';view='now';confirmEnd=false;releaseAwake();render();$('view').scrollTop=0}
     else if(a==='new'){screen='wiz';wiz=0;fixDates();render();$('view').scrollTop=0}
     else if(a==='next'){wiz=Math.min(WZ.length-1,wiz+1);render();$('view').scrollTop=0}
@@ -1202,6 +1206,11 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     else if(a==='ics')downloadIcs();
     else if(a==='calib'){S.fric=+t.dataset.v;saveS();t.textContent='Salvato per la prossima volta';t.disabled=true}
     else if(a==='end'){if(!confirmEnd){confirmEnd=true;render()}else endSes()}
+    else if(a==='abort'){
+      if(!confirmAbort){confirmAbort=true;lastSig='';render();const v=$('view');v.scrollTop=v.scrollHeight;return}
+      (SES.photos||[]).forEach(p=>IDB.del(p.k).catch(()=>{}));
+      ALL=ALL.filter(x=>x!==SES);SES=null;saveSes();confirmAbort=false;screen='home';view='now';releaseAwake();fixDates();render();
+    }
     else if(a==='endnow')endSes();
   });
   function endSes(){
