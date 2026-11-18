@@ -262,7 +262,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   const saveS=()=>store.set('lv-set',S);
   const saveSes=()=>store.set('lv-all',ALL);
 
-  const VERSION='18/11 9:55';
+  const VERSION='18/11 10:05';
   const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
   /* ---- I tuoi posti: dove sta l'impasto, con la temperatura tipica. c = posto freddo (frigo, cella) ---- */
@@ -621,8 +621,14 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     try{if(navigator.vibrate)navigator.vibrate([400,200,400,200,400])}catch(e){}
   }
   if('serviceWorker' in navigator&&location.protocol==='https:'){
-    try{navigator.serviceWorker.register('sw.js').then(()=>navigator.serviceWorker.ready).then(r=>{swReg=r}).catch(()=>{})}catch(e){}
+    try{navigator.serviceWorker.register('sw.js').then(()=>navigator.serviceWorker.ready).then(r=>{swReg=r;clearNotifs()}).catch(()=>{})}catch(e){}
   }
+  /* quando apri l'app, toglie dalla tendina le notifiche già lette e il numerino sull'icona */
+  function clearNotifs(){
+    try{if(navigator.clearAppBadge)navigator.clearAppBadge().catch(()=>{})}catch(e){}
+    try{if(swReg&&swReg.getNotifications)swReg.getNotifications().then(l=>l.forEach(n=>n.close())).catch(()=>{})}catch(e){}
+  }
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)clearNotifs()});
   function notify(title,body){
     beep();
     if(!('Notification' in window)||Notification.permission!=='granted')return;
