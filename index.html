@@ -182,7 +182,16 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     'teglia-alta':{name:'Pizza in teglia alta e soffice',d:'Tipo focaccia, mollica alta. 68% di acqua, 90 minuti di lievitazione in teglia.',idr:68,olio:3,proof:90,w:{'60':1100,'46':700}},
     'teglia-sottile':{name:'Pizza in teglia sottile e croccante',d:'Bassa e friabile. 60% di acqua, 35 minuti di lievitazione in teglia.',idr:60,olio:2,proof:35,w:{'60':600,'46':380}}
   };
-  const SOON=[['Pane',['Pane comune','Pane di grano duro','Ciabatta']],['Grandi lievitati',['Panettone','Colomba','Focaccia veneta']],['Dolci',['Brioche','Krapfen']]];
+  /* Pane morbido: crosta sottile (cottura bassa, senza vapore, telo appena sfornato). Percentuali sulla farina totale.
+     Poolish: 100% acqua, 0,1% lievito per 15-16 h a 18-20 °C. Biga: 44% acqua, 1% lievito per 16 h a 18 °C (metodo Giorilli). */
+  const PANE={
+    'pane-diretto':{type:'pane',name:'Filone morbido · diretto',d:'In giornata, circa 5 ore. Mollica morbida, crosta sottile.',idr:62,olio:3,malto:1,tgt:26,yMain:1.5,bulk:90,g:450,w:{}},
+    'pane-poolish':{type:'pane',pre:'poolish',name:'Filone morbido · poolish',d:'Poolish il giorno prima, 15 ore circa. Più profumo, resta morbido più a lungo.',idr:65,olio:3,malto:1,tgt:25,yMain:0.5,bulk:60,g:450,w:{},preF:40,preIdr:100,preY0:0.1,preH0:15,preT0:20,preT:18,preH:15},
+    'pane-biga':{type:'pane',pre:'biga',name:'Filone morbido · biga',d:'Biga il giorno prima, 16 ore circa. Mollica più strutturata, sapore più pieno.',idr:62,olio:3,malto:1,tgt:25,yMain:0.3,bulk:60,g:450,w:{},preF:50,preIdr:44,preY0:1,preH0:16,preT0:18,preT:18,preH:16}
+  };
+  Object.assign(PRODUCTS,PANE);
+  const isPane=k=>!!(PRODUCTS[k]&&PRODUCTS[k].type==='pane');
+  const SOON=[['Altro pane',['Pane di grano duro','Ciabatta','Pane in cassetta']],['Grandi lievitati',['Panettone','Colomba','Focaccia veneta']],['Dolci',['Brioche','Krapfen']]];
 
   /* ---- Impastatrici ---- */
   const MIXERS={
@@ -242,7 +251,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   }
 
   /* ---- Stato ---- */
-  const DEF={prod:'teglia-classica',n:12,fmt:'60',g:'',idr:'',mixer:'mono',cap:30,room:16,flourT:'',target:21,fric:'',fridge:4,room2:18,proofT:24,start:'',bake:''};
+  const DEF={targetP:'',preT:'',preH:'',bulkT:'',finT:'',prod:'teglia-classica',n:12,fmt:'60',g:'',idr:'',mixer:'mono',cap:30,room:16,flourT:'',target:21,fric:'',fridge:4,room2:18,proofT:24,start:'',bake:''};
   let S=Object.assign({},DEF,store.get('lv-set')||{});
   /* ALL = tutte le lavorazioni in corso; SES = quella aperta sullo schermo (o null) */
   let ALL=store.get('lv-all')||[];
@@ -253,7 +262,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   const saveS=()=>store.set('lv-set',S);
   const saveSes=()=>store.set('lv-all',ALL);
 
-  const VERSION='17/11 11:25';
+  const VERSION='18/11 9:45';
   const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
   /* ---- I tuoi posti: dove sta l'impasto, con la temperatura tipica. c = posto freddo (frigo, cella) ---- */
@@ -312,7 +321,38 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   let photoKey='';
 
   /* ---- Calcolo ---- */
+  function computePane(inp,t0){
+    const P=PRODUCTS[inp.prod],mx=MIXERS[inp.mixer]||MIXERS.mono;
+    const n=Math.max(1,+inp.n||1),g=+inp.g||P.g,idr=(+inp.idr||P.idr)/100,total=n*g;
+    const capG=Math.max(0.5,+inp.cap||mx.cap)*1000,N=Math.max(1,Math.ceil(total/capG-1e-9));
+    const room=num(inp.room,16),flT=num(inp.flourT,room),tgt=num(inp.targetP,P.tgt),fric=num(inp.fric,mx.fric);
+    const preT=num(inp.preT,P.preT||18),preH=P.pre?clamp(num(inp.preH,P.preH),4,30):0,bulkT=num(inp.bulkT,25),finT=num(inp.finT,30);
+    const r5=x=>Math.round(x/5)*5;
+    const bulkMin=r5(clamp(P.bulk*fRate(25)/fRate(bulkT),30,300)),finMin=r5(clamp(50*fRate(30)/fRate(finT),30,180));
+    const preY=P.pre?clamp(P.preY0*Math.pow(P.preH0/preH,1.1)*fRate(P.preT0)/fRate(preT),P.pre==='biga'?0.2:0.02,P.pre==='biga'?3:1):0;
+    const yTot=P.yMain+(P.pre?preY*P.preF/100:0);
+    const fl=total/(1+idr+0.02+P.olio/100+P.malto/100+yTot/100),ac=fl*idr;
+    const preFl=P.pre?fl*P.preF/100:0,preAc=P.pre?preFl*P.preIdr/100:0,preLv=preFl*preY/100,mainFl=fl-preFl,mainAc=ac-preAc,mainLv=fl*P.yMain/100;
+    const kgB=total/N/1000,k=clamp(0.4/Math.sqrt(kgB),0.06,0.25);
+    const Cf=mainFl/N/1000*1.7,Cw=mainAc/N/1000*4.18,Cp=(preFl*1.7+preAc*4.18)/N/1000,Cv=mx.cv;
+    const Tafter=(tgt-k*room)/(1-k),Tmix=Tafter-fric;
+    let Tw=(Tmix*(Cf+Cw+Cv+Cp)-Cf*flT-Cv*room-Cp*preT)/Cw,Tcap=null;
+    /* acqua oltre 40 °C non si usa: si mette a 40 e si stima la temperatura che avrà l'impasto */
+    if(Tw>40){Tw=40;const tm=(Cf*flT+Cv*room+Cp*preT+Cw*40)/(Cf+Cw+Cv+Cp),ta=tm+fric;Tcap=ta+k*(room-ta)}
+    const Tres=Tw>30?28:Tw,Tmain=Tcap!=null?40:(Tw-0.08*Tres)/0.92;
+    const mixMin=(P.pre?0:20)+3+4+3+5+6+1+15,shapeMin=10+15+10;
+    const after=mixMin+(N-1)*mx.work+bulkMin+5+shapeMin+finMin,preMin=P.pre?5+preH*60:0;
+    const want=new Date(inp.bake).getTime();
+    return {pane:true,P:P,mx:mx,n:n,g:g,idr:idr,total:total,capG:capG,N:N,room:room,flT:flT,tgt:tgt,fric:fric,
+      preT:preT,preH:preH,bulkT:bulkT,finT:finT,bulkMin:bulkMin,finMin:finMin,preY:preY,
+      fl:fl,ac:ac,sa:fl*0.02,ol:fl*P.olio/100,ma:fl*P.malto/100,lv:mainLv+preLv,yPct:yTot,
+      preFl:preFl,preAc:preAc,preLv:preLv,mainFl:mainFl,mainAc:mainAc,mainLv:mainLv,
+      k:k,Tafter:Tafter,Tmix:Tmix,Tw:Tw,Tres:Tres,Tmain:Tmain,Tcap:Tcap,
+      bake:t0+(preMin+after)*60000,want:want,ideal:want-(preMin+after)*60000,leadMin:preMin+after,
+      fr:4,r2:20,pT:finT,outMin:0,proofMin:finMin,hoursY:preH,fiPred:t0,out:t0,foldOn:false,nChk:0};
+  }
   function compute(inp,t0,yUsed){
+    if(isPane(inp.prod))return computePane(inp,t0);
     const P=PRODUCTS[inp.prod]||PRODUCTS['teglia-classica'],mx=MIXERS[inp.mixer]||MIXERS.mono;
     const n=Math.max(1,+inp.n||1),g=+inp.g||(inp.fmt==='altro'?800:P.w[inp.fmt]),idr=(+inp.idr||P.idr)/100,total=n*g;
     const capG=Math.max(0.5,+inp.cap||mx.cap)*1000,N=Math.max(1,Math.ceil(total/capG-1e-9));
@@ -340,7 +380,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
       foldOn:hoursY>20,nChk:hoursY>36?2:1,yPct:yPct,fl:fl,ac:ac,sa:fl*0.025,ol:fl*P.olio/100,lv:fl*yPct/100,
       room:room,flT:flT,tgt:tgt,fric:fric,fr:fr,r2:r2,pT:pT,outMin:outMin,proofMin:proofMin,k:k,Tafter:Tafter,Tmix:Tmix,Tw:Tw,Tres:Tres,Tmain:Tmain};
   }
-  const FZ=['yPct','fl','ac','sa','ol','lv','Tw','Tres','Tmain','Tafter','Tmix','k','room','flT','tgt','fric','foldOn','nChk','total','n','g','idr','N','capG','hoursY'];
+  const FZ=['yPct','fl','ac','sa','ol','lv','Tw','Tres','Tmain','Tafter','Tmix','k','room','flT','tgt','fric','foldOn','nChk','total','n','g','idr','N','capG','hoursY','ma','preFl','preAc','preLv','preY','mainFl','mainAc','mainLv'];
 
   /* ---- Lievitazione stimata dalle temperature registrate ----
      L'impasto si scalda o si raffredda verso l'ambiente con una costante di circa 3,2 ore (vaschetta da 5 kg,
@@ -380,7 +420,50 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   }
   function addLog(ses,e){ses.log=ses.log||[];e.t=Date.now();ses.log.push(e);saveSes()}
 
+  function buildPane(inp,t0,ses){
+    const r=compute(inp,t0);
+    if(ses&&ses.fz)FZ.forEach(k=>{if(ses.fz[k]!==undefined)r[k]=ses.fz[k]});
+    const P=r.P,N=r.N,res=Math.round(r.mainAc/N*0.08/10)*10,pre=P.pre,PN=pre==='biga'?'biga':'poolish',vn=Math.max(1,Math.ceil(r.total/6000));
+    const tm=Math.round(clamp(r.Tmain,0,60)),tr=Math.round(clamp(r.Tres,0,30)),nF=r.n;
+    const L=[],T={timer:true},st=(id,phase,h,p,dur,o)=>L.push(Object.assign({id:id,phase:phase,h:h,p:p,dur:dur,timer:false},o||{}));
+    if(pre==='poolish'){
+      st('pp','pre','Prepara il poolish','In una vaschetta mescola '+gr(r.preFl)+' di farina e '+gr(r.preAc)+' di acqua a circa 22 °C, in cui hai sciolto '+gr1(r.preLv)+' di lievito fresco. Basta un cucchiaio: deve venire una pastella liscia, senza grumi.',5,{note:'Copri con pellicola e lascialo a '+t1(r.preT)+' °C. Lascia spazio: triplica di volume.'});
+      st('pw','pre','Poolish in maturazione','Niente da fare: il poolish lavora da solo.',0,{waitH:r.preH,note:'È pronto quando è pieno di bolle e la superficie comincia ad abbassarsi al centro. Profumo leggermente acidulo, non pungente.'});
+    }else if(pre==='biga'){
+      st('pp','pre','Prepara la biga','Nella Cuppone: '+gr(r.preFl)+' di farina, '+gr(r.preAc)+' di acqua a circa 18-20 °C e '+gr1(r.preLv)+' di lievito sciolto nell\'acqua. Gira solo 2-3 minuti: deve restare grezza, a grumi, non liscia.',5,{note:'Mettila in una vaschetta, coperta ma non sigillata, a '+t1(r.preT)+' °C. Una biga lavorata troppo matura prima del tempo.'});
+      st('pw','pre','Biga in maturazione','Niente da fare: la biga lavora da sola.',0,{waitH:r.preH,note:'È pronta quando è gonfia, profuma di yogurt e frutta e, aprendola, dentro è piena di filamenti.'});
+    }
+    const lot=N>1?' per lotto':'';
+    st('i1','impasto','Carica la vasca','Metti '+gr(r.mainAc/N-res)+' di acqua a '+tm+' °C'+(pre?', poi '+(pre==='biga'?'la biga spezzettata':'il poolish')+' ('+gr((r.preFl+r.preAc)/N)+')':'')+' e '+gr(r.mainFl/N)+' di farina'+lot+'.',3,{note:'Tieni da parte '+gr(res)+' di acqua a '+tr+' °C per lievito e sale.'+(pre==='biga'?' Con la biga l\'impasto è duro all\'inizio: se serve, aggiungi l\'acqua tenuta da parte un po\' alla volta mentre gira.':'')});
+    st('i2','impasto','Mescola per amalgamare','Velocità unica, 4 minuti, finché non c\'è più farina asciutta.',4,T);
+    if(!pre)st('i3','impasto','Autolisi','Ferma la macchina, copri la vasca e lascia riposare 20 minuti.',20,T);
+    st('i4','impasto','Aggiungi il lievito','Sciogli '+gr1(r.mainLv/N)+' di lievito fresco in metà dell\'acqua tenuta da parte ('+tr+' °C) e versalo. Impasta 3 minuti.',3,T);
+    st('i5','impasto','Aggiungi sale e malto','Versa '+gr(r.sa/N)+' di sale e '+gr(r.ma/N)+' di malto (o zucchero) sciolti nel resto dell\'acqua. Impasta 4-5 minuti fino ad assorbimento.',5,{timer:true,note:'Il malto aiuta la crosta a colorarsi anche a bassa temperatura.'});
+    st('i6','impasto','Olio e incordatura','Versa '+gr(r.ol/N)+' di olio a filo e continua 3-6 minuti, finché l\'impasto si stacca dalla vasca.',6,{timer:true,anim:'veil',note:'Fai la prova del velo: se si strappa subito, lavora ancora 1-2 minuti.'});
+    st('i7','impasto','Misura la temperatura','Termometro al centro dell\'impasto. Obiettivo '+t1(r.tgt)+' °C, va bene da '+t1(r.tgt-1)+' a '+t1(r.tgt+1)+' °C.',1,{meas:true});
+    const half=Math.round(r.bulkMin/2/5)*5;
+    st('b1','lievitazione','Puntata','Metti l\'impasto in '+vn+(vn>1?' vaschette unte':' vaschetta unta')+', coperto, a '+t1(r.bulkT)+' °C (cella di lievitazione).',half,T);
+    st('b2','lievitazione','Giro di pieghe','Con le mani bagnate tira un lembo verso l\'alto e ripiegalo sul centro, gira di un quarto e ripeti: 4 pieghe. Ricopri.',2,{anim:'fold'});
+    st('b3','lievitazione','Puntata, seconda parte','Ancora '+(r.bulkMin-half)+' minuti a '+t1(r.bulkT)+' °C.',r.bulkMin-half,{timer:true,note:'Deve crescere di circa la metà e mostrare bolle ai lati.'});
+    st('f1','forma','Dividi e preforma','Rovescia sul piano leggermente infarinato. Taglia '+nF+' pezzi da '+gr(r.g)+' (pesali). Arrotola ogni pezzo in un cilindro corto, giuntura sotto, e copri con un telo.',10,{note:'Usa poca farina: troppa impedisce di chiudere bene i filoni.'});
+    st('f2','forma','Riposo dei pezzi','Lasciali coperti 15 minuti: si rilassano e poi si allungano senza strapparsi.',15,T);
+    st('pf','forma','Forma i filoni','Schiaccia ogni pezzo in un rettangolo, arrotolalo stretto dal lato lungo premendo con i pollici, chiudi bene la giuntura e allunga rotolando con i palmi fino a 30 cm circa. Su teglia con carta forno, giuntura sotto, distanziati.',10);
+    st('proof','forma','Lievitazione finale','In cella a '+t1(r.finT)+' °C, modalità umida, per circa '+r.finMin+' minuti. Accendi il forno a 175 °C statico (o 165 °C ventilato) 30 minuti prima.',r.finMin,{timer:true,anim:'poke',note:'Pronti quando sono quasi raddoppiati e l\'impronta del dito torna su piano piano. Per una crosta più morbida e lucida spennellali con un po\' di latte o un filo d\'olio.'});
+    st('cuoci','forno','Cuoci i filoni','175 °C statico, senza vapore, 35-40 minuti. Sono cotti quando la sonda al cuore segna 96-98 °C, o battendo sotto suonano vuoto.',38,{timer:true,note:'Se si colorano troppo presto, abbassa a 165 °C. Più alta è la temperatura, più la crosta diventa dura.'});
+    st('telo','forno','Copri i filoni con un telo','Appena sfornati coprili con un telo pulito mentre raffreddano: il vapore ammorbidisce la crosta. Non tagliarli prima di 30 minuti.',0);
+    const done=ses?ses.done:{},now=Date.now();let t=t0;
+    L.forEach(s=>{
+      if(s.waitH){s.wait=true;s.at=t+s.waitH*3600000;s.plan=s.at;t=done[s.id]?done[s.id]:Math.max(t,s.at);return}
+      if(done[s.id]){s.plan=done[s.id];t=done[s.id]}
+      else if(ses&&ses.cur&&ses.cur.id===s.id){s.plan=ses.cur.since;t=Math.max(now,ses.cur.since+s.dur*60000)}
+      else{s.plan=t;t+=s.dur*60000}
+    });
+    L.forEach(s=>{if(done[s.id])s.doneAt=done[s.id];s.qs=QMAP(s);if(s.id==='b3')s.qs=['bub'];if(s.id==='f1')s.qs=['stick']});
+    const ck=L.find(s=>s.id==='cuoci');r.bake=ck?ck.plan:r.bake;
+    return {r:r,steps:L,fi:t0,out:t0,F:null,nT:0,nF:nF,paneG:r.total};
+  }
   function build(inp,t0,ses){
+    if(isPane(inp.prod))return buildPane(inp,t0,ses);
     const r=compute(inp,t0,ses&&ses.fz?ses.fz.yPct:0);
     if(ses&&ses.fz)FZ.forEach(k=>{r[k]=ses.fz[k]});
     const N=r.N,res=Math.round(r.ac/N*0.08/10)*10,vn=Math.max(1,Math.ceil(r.total/6000));
@@ -441,7 +524,20 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   }
 
   /* ---- Blocchi di contenuto ---- */
+  function doseHtmlPane(r){
+    const multi=r.N>1,row=(a,b,v,f)=>'<tr><td>'+a+(b?'<small>'+b+'</small>':'')+'</td><td class="v">'+f(v)+'</td>'+(multi?'<td class="v">'+f(v/r.N)+'</td>':'')+'</tr>';
+    const PN=r.P.pre==='biga'?'Biga':'Poolish';
+    let h='<table><thead><tr><th>Ingrediente</th><th>Totale</th>'+(multi?'<th>Per lotto</th>':'')+'</tr></thead><tbody>';
+    if(r.P.pre)h+='<tr><td colspan="'+(multi?3:2)+'"><b>'+PN+'</b> · il giorno prima, '+t1(r.preH)+' ore a '+t1(r.preT)+' °C</td></tr>'+
+      row('Farina','',r.preFl,gr)+row('Acqua',r.P.pre==='biga'?'18-20 °C':'circa 22 °C',r.preAc,gr)+row('Lievito fresco',(Math.round(r.preY*100)/100).toLocaleString('it-IT')+'% sulla farina '+(r.P.pre==='biga'?'della biga':'del poolish'),r.preLv,gr1)+
+      '<tr><td colspan="'+(multi?3:2)+'"><b>Impasto finale</b></td></tr>';
+    h+=row('Farina Rebelde','',r.mainFl,gr)+row('Acqua',Math.round(clamp(r.Tmain,0,60))+' °C la parte principale, '+Math.round(clamp(r.Tres,0,30))+' °C quella tenuta da parte',r.mainAc,gr)+
+      row('Sale','2%',r.sa,gr)+row('Malto o zucchero','1%',r.ma,gr)+row('Olio EVO',r.P.olio+'%',r.ol,gr)+row('Lievito fresco',(Math.round(r.P.yMain*100)/100).toLocaleString('it-IT')+'%',r.mainLv,gr1)+'</tbody></table>';
+    h+='<div class="pills"><div class="pill"><b>'+t1(r.total/1000)+' kg</b><span>impasto</span></div><div class="pill"><b>'+r.n+' × '+Math.round(r.g)+'</b><span>filoni × grammi</span></div><div class="pill"><b>'+Math.round(r.idr*100)+'%</b><span>acqua totale</span></div></div>';
+    return h;
+  }
   function doseHtml(r){
+    if(r.pane)return doseHtmlPane(r);
     const multi=r.N>1;
     const rows=[['Farina Rebelde','',r.fl,gr],
       ['Acqua',Math.round(clamp(r.Tmain,0,60))+' °C la parte principale, '+Math.round(clamp(r.Tres,0,30))+' °C quella tenuta da parte',r.ac,gr],
@@ -466,23 +562,31 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     const tm=Math.round(r.Tmain),tr=Math.round(clamp(r.Tres,0,30)),loss=r.Tafter-r.tgt;
     let h='<div class="result"><div><b>'+clamp(tm,0,60)+'°</b><span>acqua principale</span></div><div><b>'+tr+'°</b><span>acqua da parte, per lievito e sale</span></div><div><b>'+t1(r.tgt)+'°</b><span>impasto finito</span></div></div>';
     const W=[];
-    if(r.Tmain>45)W.push(['bad','Servirebbe acqua a '+tm+' °C: troppo calda. Porta la farina in un locale caldo qualche ora prima, oppure abbassa la temperatura dell\'impasto finito.']);
-    else if(r.Tmain>30)W.push(['','Acqua a '+tm+' °C va bene: il lievito entra dopo l\'autolisi, sciolto nell\'acqua a '+tr+' °C. Mai sciogliere il lievito sopra i 35 °C.']);
+    if(r.Tcap!=null)W.push(['bad','Con la sala a '+t1(r.room)+' °C servirebbe acqua troppo calda: usala a 40 °C e l\'impasto verrà circa '+t1(r.Tcap)+' °C invece di '+t1(r.tgt)+' °C. Metti la puntata in cella a 27 °C per recuperare, oppure porta farina'+(r.pane&&r.P.pre?' e '+(r.P.pre==='biga'?'biga':'poolish'):'')+' in un locale più caldo qualche ora prima.']);
+    else if(r.Tmain>45)W.push(['bad','Servirebbe acqua a '+tm+' °C: troppo calda. Porta la farina in un locale caldo qualche ora prima, oppure abbassa la temperatura dell\'impasto finito.']);
+    else if(r.Tmain>30)W.push(['','Acqua a '+tm+' °C va bene: il lievito si scioglie a parte, nell\'acqua tenuta da parte a '+tr+' °C. Mai sciogliere il lievito sopra i 35 °C.']);
     if(r.Tmain<0)W.push(['bad','Anche con acqua a 0 °C l\'impasto verrebbe troppo caldo. Raffredda la farina o alza la temperatura dell\'impasto finito.']);
     else if(r.Tmain<4)W.push(['','Serve acqua quasi gelata: metti ghiaccio nel secchio e pesalo come parte dell\'acqua.']);
     if(r.room<15)W.push(['','Sala fredda: copri sempre la vasca durante autolisi e riposo.']);
     h+=W.map(w=>'<p class="msg '+w[0]+'">'+w[1]+'</p>').join('');
-    h+='<ol class="chain"><li>Farina a '+t1(r.flT)+' °C, vasca a '+t1(r.room)+' °C e acqua a '+t1(r.Tw)+' °C: appena mescolati fanno <b>'+t1(r.Tmix)+' °C</b>.</li>'+
+    h+='<ol class="chain"><li>Farina a '+t1(r.flT)+' °C, vasca a '+t1(r.room)+' °C'+(r.pane&&r.P.pre?', '+(r.P.pre==='biga'?'biga':'poolish')+' a '+t1(r.preT)+' °C':'')+' e acqua a '+t1(r.Tw)+' °C: appena mescolati fanno <b>'+t1(r.Tmix)+' °C</b>.</li>'+
       '<li>L\'impastatrice scalda di circa '+t1(r.fric)+' °C: <b>'+t1(r.Tafter)+' °C</b>.</li>'+
       '<li>Durante autolisi e riposo la sala '+(loss>=0?'toglie':'aggiunge')+' circa '+t1(Math.abs(loss))+' °C: <b>'+t1(r.tgt)+' °C</b>.</li></ol>';
     return h;
   }
   function laterHtml(r){
+    if(r.pane)return '<ul class="rules">'+(r.P.pre?'<li><b>'+(r.P.pre==='biga'?'Biga':'Poolish')+' a '+t1(r.preT)+' °C per '+t1(r.preH)+' ore.</b> Lievito '+(Math.round(r.preY*100)/100).toLocaleString('it-IT')+'% sulla sua farina: più caldo o più ore, meno lievito.</li>':'')+
+      '<li><b>Puntata a '+t1(r.bulkT)+' °C:</b> '+r.bulkMin+' minuti, con un giro di pieghe a metà.</li><li><b>Lievitazione finale a '+t1(r.finT)+' °C</b>, umida: '+r.finMin+' minuti.</li><li><b>Cottura:</b> 175 °C statico, senza vapore, 35-40 minuti, poi sotto un telo.</li></ul>';
     return '<ul class="rules"><li><b>Frigo a '+t1(r.fr)+' °C.</b> '+(r.fr>6?'È caldo per una maturazione lunga: il lievito è ridotto, ma controlla l\'impasto più spesso.':r.fr<2?'Molto freddo: l\'impasto rischia di fermarsi, il lievito è aumentato.':'Il lievito è calcolato su questa temperatura.')+'</li>'+
       '<li><b>Fuori dal frigo a '+t1(r.r2)+' °C:</b> '+hmin(r.outMin)+' prima di stendere.</li>'+
       '<li><b>In teglia a '+t1(r.pT)+' °C:</b> '+r.proofMin+' minuti di lievitazione.</li></ul>';
   }
   function timeMsg(r,t0){
+    if(r.pane){
+      if(!isFinite(r.want))return {bad:true,block:true,txt:'Imposta l\'ora in cui vuoi infornare.'};
+      const late=r.ideal<Date.now()-5*60000;
+      return {bad:late,txt:'Per infornare '+fmtT(r.want)+(r.P.pre?(r.P.pre==='biga'?' prepara la biga':' prepara il poolish'):' inizia')+' <b>'+fmtT(r.ideal)+'</b>.'+(late?' È già passato: se inizi adesso inforni verso <b>'+fmtT(r.bake)+'</b>.':' Se inizi adesso inforni verso '+fmtT(r.bake)+'.')};
+    }
     if(!isFinite(r.bake))return {bad:true,block:true,txt:'Imposta l\'ora di infornata.'};
     if(r.bake<=t0||r.hoursY<=0)return {bad:true,block:true,txt:'Non c\'è tempo: l\'infornata deve essere almeno un giorno dopo l\'inizio dell\'impasto.'};
     if(r.hoursY<12)return {bad:true,txt:'In frigo restano solo '+Math.round(r.hoursY)+' ore: poche per questa ricetta. Sposta l\'infornata più avanti.'};
@@ -490,6 +594,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     return {txt:'In frigo circa <b>'+Math.round(r.hoursY)+' ore</b>, da '+fmtT(r.fiPred)+' a '+fmtT(r.out)+'. Lievito: <b>'+gr1(r.lv)+'</b>.'};
   }
   function rulesHtml(r){
+    if(r.pane)return '<ul class="rules"><li><b>'+r.mx.name+'.</b> '+r.mx.rule+'</li><li><b>Crosta morbida.</b> Cottura bassa (175 °C), niente vapore, malto per il colore, olio nell\'impasto e telo appena sfornato.</li><li><b>Pesa ogni pezzo:</b> '+gr(r.g)+' a filone, così cuociono tutti uguali.</li></ul>';
     return '<ul class="rules"><li><b>'+r.mx.name+'.</b> '+r.mx.rule+'</li>'+
       '<li><b>'+r.P.name+'.</b> Acqua '+Math.round(r.idr*100)+'%, olio '+r.P.olio+'%, circa '+gr(r.g)+' a teglia.</li>'+
       '<li><b>Lievito '+(Math.round(r.yPct*100)/100).toLocaleString('it-IT')+'%.</b> Calcolato su circa '+Math.round(r.hoursY)+' ore di frigo a '+t1(r.fr)+' °C e impasto a '+t1(r.tgt)+' °C. Più ore o frigo più caldo: meno lievito.</li>'+
@@ -736,10 +841,12 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   const WZ=[
     {html:()=>'<canvas id="art" class="art" aria-hidden="true"></canvas><div class="lbl">Con la farina del tuo grano Rebelde</div><h1>Cosa prepari?</h1>'+
       '<label>Prodotto<select data-k="prod" data-rr>'+
-      '<optgroup label="Pizza">'+Object.keys(PRODUCTS).map(k=>'<option value="'+k+'"'+(S.prod===k?' selected':'')+'>'+PRODUCTS[k].name+'</option>').join('')+'</optgroup>'+
+      '<optgroup label="Pizza">'+Object.keys(PRODUCTS).filter(k=>!isPane(k)).map(k=>'<option value="'+k+'"'+(S.prod===k?' selected':'')+'>'+PRODUCTS[k].name+'</option>').join('')+'</optgroup>'+
+      '<optgroup label="Pane">'+Object.keys(PRODUCTS).filter(isPane).map(k=>'<option value="'+k+'"'+(S.prod===k?' selected':'')+'>'+PRODUCTS[k].name+'</option>').join('')+'</optgroup>'+
       SOON.map(g=>'<optgroup label="'+g[0]+'">'+g[1].map(n=>'<option disabled>'+n+' (in arrivo)</option>').join('')+'</optgroup>').join('')+
       '</select></label><p class="msg">'+PRODUCTS[S.prod].d+'</p>',der:()=>''},
-    {html:r=>'<h1>Quanta ne fai?</h1><div class="grid">'+fld('Numero di teglie','n',S.n,'min="1" max="60" step="1" inputmode="numeric"')+
+    {html:r=>r.pane?'<h1>Quanti filoni?</h1><div class="grid">'+fld('Numero di filoni','n',S.n,'min="1" max="100" step="1" inputmode="numeric"')+fld('Peso a filone (g)','g',S.g,'min="100" step="10" inputmode="numeric"',r.P.g)+fld('Acqua (% sulla farina)','idr',S.idr,'min="55" max="78" step="1" inputmode="numeric"',r.P.idr)+'</div><div id="der" class="stack"></div>':
+      '<h1>Quanta ne fai?</h1><div class="grid">'+fld('Numero di teglie','n',S.n,'min="1" max="60" step="1" inputmode="numeric"')+
       '<label>Formato teglia<select data-k="fmt" data-rr><option value="60"'+(S.fmt==='60'?' selected':'')+'>60×40 cm</option><option value="46"'+(S.fmt==='46'?' selected':'')+'>46×33 cm</option><option value="altro"'+(S.fmt==='altro'?' selected':'')+'>Altro</option></select></label>'+
       fld('Impasto per teglia (g)','g',S.g,'min="100" step="10" inputmode="numeric"',Math.round(S.fmt==='altro'?800:r.P.w[S.fmt]))+
       fld('Acqua (% sulla farina)','idr',S.idr,'min="55" max="78" step="1" inputmode="numeric"',r.P.idr)+'</div><div id="der" class="stack"></div>',
@@ -749,15 +856,17 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
      der:r=>loadMsg(r)+'<p class="sub">'+r.mx.rule+'</p>'},
     {html:r=>'<h1>Temperature dell\'impasto</h1><p class="sub">Misurale col termometro. Farina e vasca prendono la temperatura della stanza in cui stanno.</p><div class="grid">'+
       fld('Sala dove impasti (°C)','room',S.room,'step="0.5" inputmode="decimal"')+fld('Farina (°C)','flourT',S.flourT,'step="0.5" inputmode="decimal"','come la sala')+
-      fld('Impasto finito (°C)','target',S.target,'min="16" max="27" step="0.5" inputmode="decimal"')+fld('Calore impastatrice (°C)','fric',S.fric,'min="0" max="20" step="0.5" inputmode="decimal"',r.mx.fric)+'</div><div id="der" class="stack"></div>',
+      (r.pane?fld('Impasto finito (°C)','targetP',S.targetP,'min="18" max="29" step="0.5" inputmode="decimal"',r.P.tgt):fld('Impasto finito (°C)','target',S.target,'min="16" max="27" step="0.5" inputmode="decimal"'))+fld('Calore impastatrice (°C)','fric',S.fric,'min="0" max="20" step="0.5" inputmode="decimal"',r.mx.fric)+'</div><div id="der" class="stack"></div>',
      der:r=>waterHtml(r)},
-    {html:()=>'<h1>Frigo e giorno del forno</h1><div class="grid">'+fld('Frigo (°C)','fridge',S.fridge,'min="0" max="10" step="0.5" inputmode="decimal"')+
+    {html:r=>r.pane?'<h1>'+(r.P.pre?(r.P.pre==='biga'?'Biga':'Poolish')+' e lievitazioni':'Lievitazioni')+'</h1><div class="grid">'+(r.P.pre?fld('Dove matura '+(r.P.pre==='biga'?'la biga':'il poolish')+' (°C)','preT',S.preT,'step="0.5" inputmode="decimal"',r.P.preT)+fld('Ore di maturazione','preH',S.preH,'min="4" max="30" step="1" inputmode="numeric"',r.P.preH):'')+
+        fld('Puntata, in cella (°C)','bulkT',S.bulkT,'step="0.5" inputmode="decimal"',25)+fld('Lievitazione finale (°C)','finT',S.finT,'step="0.5" inputmode="decimal"',30)+'</div><div id="der" class="stack"></div>':
+      '<h1>Frigo e giorno del forno</h1><div class="grid">'+fld('Frigo (°C)','fridge',S.fridge,'min="0" max="10" step="0.5" inputmode="decimal"')+
       fld('Dove si acclimata (°C)','room2',S.room2,'step="0.5" inputmode="decimal"')+fld('Dove lievitano le teglie (°C)','proofT',S.proofT,'step="0.5" inputmode="decimal"')+'</div><div id="der" class="stack"></div>',
      der:r=>laterHtml(r)},
-    {html:()=>'<h1>Quando?</h1><label>Ora di infornata<input type="datetime-local" data-k="bake" value="'+S.bake+'"></label>'+
+    {html:r=>r.pane?'<h1>Quando?</h1><label>Ora in cui vuoi infornare<input type="datetime-local" data-k="bake" value="'+S.bake+'"></label><div id="der" class="stack"></div>':'<h1>Quando?</h1><label>Ora di infornata<input type="datetime-local" data-k="bake" value="'+S.bake+'"></label>'+
       '<label>Inizio impasto previsto<input type="datetime-local" data-k="start" value="'+S.start+'"></label>'+
       '<button type="button" class="btn ghost small" data-act="startnow">Inizio adesso</button><div id="der" class="stack"></div>',
-     der:(r,t0)=>{const m=timeMsg(r,t0);return '<p class="msg'+(m.bad?' bad':'')+'">'+m.txt+'</p><p class="sub">L\'orario vero di inizio lo fissi quando premi Inizia.</p>'}},
+     der:(r,t0)=>{const m=timeMsg(r,t0);return '<p class="msg'+(m.bad?' bad':'')+'">'+m.txt+'</p><p class="sub">'+(r.pane?'Gli orari partono da quando premi Inizia: torna qui all\'ora indicata.':'L\'orario vero di inizio lo fissi quando premi Inizia.')+'</p>'}},
     {html:(r,t0)=>{const m=timeMsg(r,t0);return '<h1>Dosi</h1>'+doseHtml(r)+'<p class="msg'+(m.bad?' bad':'')+'">'+m.txt+'</p><p class="sub">Premendo Inizia le dosi si fissano e parte il primo passaggio.</p>'},der:()=>''}
   ];
   function derived(){const d=$('der');if(d&&!SES){const t0=startMs();d.innerHTML=WZ[wiz].der(compute(S,t0),t0)}}
@@ -772,7 +881,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     }).join('')+'</div>';
   }
   const CRIT=[['vol','Volume'],['alv','Alveolatura'],['mor','Morbidezza'],['cro','Crosta'],['sap','Sapore']];
-  const prodsOf=(ses,P)=>[['pizza',P.r.P.name]].concat(+(ses.inp.paneKg||0)>0?[['pane','Filoni di pane']]:[]);
+  const prodsOf=(ses,P)=>P.r.pane?[['pane',P.r.P.name]]:[['pizza',P.r.P.name]].concat(+(ses.inp.paneKg||0)>0?[['pane','Filoni di pane']]:[]);
   function judgeHtml(P){
     SES.j=SES.j||{};
     return '<div class="lbl">Finito</div><h1>Com\'è venuta?</h1><p class="sub">Un voto da 1 a 5 per ogni voce, una foto e un commento. Resta nello storico e serve per regolare la prossima volta.</p>'+
@@ -831,7 +940,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     let h='<div class="tabs">'+tabs.map(t=>'<button type="button" class="tab'+(sumTab===t[0]?' on':'')+'" data-tab="'+t[0]+'">'+t[1]+'</button>').join('')+'</div>';
     const r=P.r;
     if(sumTab==='steps'){
-      const G={impasto:'Impasto',frigo:'In frigo',forno:'Giorno del forno'};let ph='';
+      const G=P.r.pane?{pre:P.r.P.pre==='biga'?'Biga':'Poolish',impasto:'Impasto',lievitazione:'Puntata',forma:'Forma e lievitazione finale',forno:'Cottura'}:{impasto:'Impasto',frigo:'In frigo',forno:'Giorno del forno'};let ph='';
       P.steps.forEach((s,i)=>{
         if(s.phase!==ph){h+=(ph?'</ul>':'')+'<h3 class="grp">'+G[s.phase]+'</h3><ul class="list">';ph=s.phase}
         const dn=!!SES.done[s.id],cur=i===stt.idx;
@@ -847,18 +956,19 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
       h+=(P.F?'<div class="tcard"><div class="lbl">Lievitazione</div><p>'+fstText(P)+'</p></div>'+logHtml():'')+waterHtml(r)+(SES.meas?'<p class="msg">Impasto misurato a fine lavorazione: <b>'+t1(+SES.meas)+' °C</b>.</p>':'')+laterHtml(r);
     }else{
       const i=SES.inp;
-      h+='<h3 class="grp">Giorno del forno</h3><label>Ora di infornata<input type="datetime-local" data-sk="bake" value="'+i.bake+'"></label><div class="grid">'+
+      if(r.pane)h+='<h3 class="grp">Cottura</h3><p class="sub">Infornata prevista verso '+fmtT(P.r.bake)+'.</p>';
+      else h+='<h3 class="grp">Giorno del forno</h3><label>Ora di infornata<input type="datetime-local" data-sk="bake" value="'+i.bake+'"></label><div class="grid">'+
         '<label>Dove si acclimata (°C)<input type="number" data-sk="room2" step="0.5" inputmode="decimal" value="'+i.room2+'"></label>'+
         '<label>Dove lievitano le teglie (°C)<input type="number" data-sk="proofT" step="0.5" inputmode="decimal" value="'+i.proofT+'"></label></div>'+
         '<label>Ore fuori dal frigo prima di stendere<input type="number" data-sk="outH" min="1" max="24" step="0.5" inputmode="decimal" value="'+(i.outH||'')+'" placeholder="'+t1(r.outMin/60)+' (calcolate)"></label>'+
-        '<p class="sub">Cambiando questi valori si spostano gli orari di uscita dal frigo, stesura e forno. Le dosi restano quelle già pesate.</p>'+
-        '<h3 class="grp">Avvisi</h3><p class="sub">'+notifText()+'</p>'+
+        '<p class="sub">Cambiando questi valori si spostano gli orari di uscita dal frigo, stesura e forno. Le dosi restano quelle già pesate.</p>';
+      h+='<h3 class="grp">Avvisi</h3><p class="sub">'+notifText()+'</p>'+
         (('Notification' in window)&&Notification.permission==='default'?'<button type="button" class="btn ghost small" data-act="notif">Attiva notifiche</button>':'')+
         (notifOn()?'<button type="button" class="btn ghost small" data-act="testn">Manda una notifica di prova</button>':'')+
         '<button type="button" class="btn ghost small" data-act="ics">Metti i promemoria nel calendario</button>'+
         '<p class="sub">I promemoria del calendario suonano anche con l\'app chiusa: usali per i controlli in frigo e per il giorno del forno.</p>'+
         '<label class="switch"><input type="checkbox" id="awake"'+(awakeOn?' checked':'')+'> Tieni lo schermo acceso</label>'+
-        '<h3 class="grp">Pizza e pane</h3><label>Impasto da usare per i filoni di pane (kg)<input type="number" data-sk="paneKg" min="0" step="0.5" inputmode="decimal" value="'+(+(i.paneKg||0)||'')+'" placeholder="0 = tutto pizza"></label>'+
+        (r.pane?'':'<h3 class="grp">Pizza e pane</h3><label>Impasto da usare per i filoni di pane (kg)<input type="number" data-sk="paneKg" min="0" step="0.5" inputmode="decimal" value="'+(+(i.paneKg||0)||'')+'" placeholder="0 = tutto pizza"></label>')+
         '<h3 class="grp">Chiudi</h3><button type="button" class="btn ghost small danger" data-act="end">'+(confirmEnd?'Conferma: termina e salva nello storico':'Termina la preparazione')+'</button>';
     }
     return h;
@@ -879,7 +989,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     const P=build(H.inp,H.t0,H),r=P.r,st=strength(H);
     let h='<div class="lbl">'+fmtT(H.t0)+'</div><h1>'+esc(H.name)+'</h1>';
     h+='<table><tbody>'+[['Farina',gr(r.fl)],['Acqua',gr(r.ac)+' · '+Math.round(r.idr*100)+'%'],['Sale',gr(r.sa)],['Olio',gr(r.ol)],['Lievito fresco',gr1(r.lv)+' · '+(Math.round(r.yPct*100)/100).toLocaleString('it-IT')+'%'],['Impastatrice',r.mx.name]]
-      .concat(H.meas?[['Impasto a fine lavorazione',t1(+H.meas)+' °C']]:[]).concat(+(H.inp.paneKg||0)>0?[['Pizza / pane',P.nT+' teglie · '+P.nF+' filoni']]:[['Teglie',r.n+' da '+gr(r.g)]])
+      .concat(H.meas?[['Impasto a fine lavorazione',t1(+H.meas)+' °C']]:[]).concat(r.pane?[['Filoni',r.n+' da '+gr(r.g)]]:+(H.inp.paneKg||0)>0?[['Pizza / pane',P.nT+' teglie · '+P.nF+' filoni']]:[['Teglie',r.n+' da '+gr(r.g)]])
       .map(x=>'<tr><td>'+x[0]+'</td><td class="v" style="font-size:1.1rem">'+x[1]+'</td></tr>').join('')+'</tbody></table>';
     if(st)h+='<p class="msg">Farina giudicata <b>'+sLabel(st)+'</b> dalle risposte durante la lavorazione.</p>';
     prodsOf(H,P).forEach(([k,n])=>{const J=(H.j||{})[k]||{};
@@ -1114,7 +1224,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     if(el.dataset.k&&!SES){
       const k=el.dataset.k;
       S[k]=el.type==='number'?(el.value===''?'':parseFloat(el.value)):el.value;
-      if(k==='prod'||k==='fmt'){S.g='';if(k==='prod')S.idr=''}
+      if(k==='prod'||k==='fmt'){S.g='';if(k==='prod'){S.idr='';S.preT='';S.preH='';if(isPane(S.prod)&&(+S.n||0)>40)S.n=10}}
       saveS();
       if(el.dataset.rr!==undefined)render();else{derived();if(k==='bake'||k==='start'){const b=document.querySelector('[data-act=start]');if(b)b.disabled=!!timeMsg(compute(S,startMs()),startMs()).block}}
     }else if(el.dataset.com&&SES){
