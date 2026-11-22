@@ -190,10 +190,10 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     'pane-biga':{type:'pane',pre:'biga',name:'Filone morbido · biga',d:'Biga il giorno prima, 16 ore circa. Mollica più strutturata, sapore più pieno.',idr:62,olio:3,malto:1,tgt:25,yMain:0.3,bulk:60,g:450,w:{},preF:50,preIdr:44,preY0:1,preH0:16,preT0:18,preT:18,preH:16}
   };
     /* Pane in cassetta: diretto, liquidi metà acqua e metà latte, 4% zucchero, 6% olio, cottura in stampo con coperchio */
-  PANE['pane-cassetta']={type:'pane',cassetta:true,name:'Pane in cassetta',d:'Morbido, a fette quadrate. Diretto in giornata, circa 4 ore, cotto in stampo con coperchio.',idr:62,milk:50,olio:6,malto:4,tgt:26,yMain:2,bulk:60,fin:60,g:800,w:{}};
+  PANE['pane-cassetta']={type:'pane',cassetta:true,name:'Pane in cassetta',d:'Pancarrè morbido con latte e burro (o olio). Si fa in giornata, circa 4 ore. In stampo chiuso viene a fette quadrate, in stampo aperto con la cupola dorata.',idr:62,milk:50,olio:6,malto:4,tgt:26,yMain:2,bulk:60,fin:60,g:800,w:{}};
   Object.assign(PRODUCTS,PANE);
   const isPane=k=>!!(PRODUCTS[k]&&PRODUCTS[k].type==='pane');
-  const SOON=[['Altro pane',['Pane di grano duro','Ciabatta','Pane in cassetta']],['Grandi lievitati',['Panettone','Colomba','Focaccia veneta']],['Dolci',['Brioche','Krapfen']]];
+  const SOON=[['Altro pane',['Pane di grano duro','Ciabatta']],['Grandi lievitati',['Panettone','Colomba','Focaccia veneta']],['Dolci',['Brioche','Krapfen']]];
 
   /* ---- Impastatrici ---- */
   const MIXERS={
@@ -264,7 +264,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   const saveS=()=>store.set('lv-set',S);
   const saveSes=()=>store.set('lv-all',ALL);
 
-  const VERSION='22/11 12:05';
+  const VERSION='22/11 12:10';
   const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
   /* ---- I tuoi posti: dove sta l'impasto, con la temperatura tipica. c = posto freddo (frigo, cella) ---- */
