@@ -253,7 +253,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   }
 
   /* ---- Stato ---- */
-  const DEF={targetP:'',preT:'',preH:'',bulkT:'',finT:'',prod:'teglia-classica',n:12,fmt:'60',g:'',idr:'',mixer:'mono',cap:30,room:16,flourT:'',target:21,fric:'',fridge:4,room2:18,proofT:24,start:'',bake:''};
+  const DEF={fat:'burro',targetP:'',preT:'',preH:'',bulkT:'',finT:'',prod:'teglia-classica',n:12,fmt:'60',g:'',idr:'',mixer:'mono',cap:30,room:16,flourT:'',target:21,fric:'',fridge:4,room2:18,proofT:24,start:'',bake:''};
   let S=Object.assign({},DEF,store.get('lv-set')||{});
   /* ALL = tutte le lavorazioni in corso; SES = quella aperta sullo schermo (o null) */
   let ALL=store.get('lv-all')||[];
@@ -264,7 +264,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   const saveS=()=>store.set('lv-set',S);
   const saveSes=()=>store.set('lv-all',ALL);
 
-  const VERSION='22/11 11:30';
+  const VERSION='22/11 11:45';
   const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
   /* ---- I tuoi posti: dove sta l'impasto, con la temperatura tipica. c = posto freddo (frigo, cella) ---- */
@@ -332,8 +332,9 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     const r5=x=>Math.round(x/5)*5;
     const bulkMin=r5(clamp(P.bulk*fRate(25)/fRate(bulkT),30,300)),finMin=r5(clamp((P.fin||50)*fRate(30)/fRate(finT),30,180));
     const preY=P.pre?clamp(P.preY0*Math.pow(P.preH0/preH,1.1)*fRate(P.preT0)/fRate(preT),P.pre==='biga'?0.2:0.02,P.pre==='biga'?3:1):0;
+    const butter=!!(P.cassetta&&inp.fat!=='olio'),fatP=butter?7:P.olio;
     const yTot=P.yMain+(P.pre?preY*P.preF/100:0);
-    const fl=total/(1+idr+0.02+P.olio/100+P.malto/100+yTot/100),ac=fl*idr;
+    const fl=total/(1+idr+0.02+fatP/100+P.malto/100+yTot/100),ac=fl*idr;
     const preFl=P.pre?fl*P.preF/100:0,preAc=P.pre?preFl*P.preIdr/100:0,preLv=preFl*preY/100,mainFl=fl-preFl,mainAc=ac-preAc,mainLv=fl*P.yMain/100;
     const kgB=total/N/1000,k=clamp(0.4/Math.sqrt(kgB),0.06,0.25);
     const Cf=mainFl/N/1000*1.7,Cw=mainAc/N/1000*4.18,Cp=(preFl*1.7+preAc*4.18)/N/1000,Cv=mx.cv;
@@ -347,7 +348,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     const want=new Date(inp.bake).getTime();
     return {pane:true,P:P,mx:mx,n:n,g:g,idr:idr,total:total,capG:capG,N:N,room:room,flT:flT,tgt:tgt,fric:fric,
       preT:preT,preH:preH,bulkT:bulkT,finT:finT,bulkMin:bulkMin,finMin:finMin,preY:preY,
-      fl:fl,ac:ac,sa:fl*0.02,ol:fl*P.olio/100,ma:fl*P.malto/100,lv:mainLv+preLv,yPct:yTot,
+      fl:fl,ac:ac,sa:fl*0.02,ol:fl*fatP/100,butter:butter,fatP:fatP,ma:fl*P.malto/100,lv:mainLv+preLv,yPct:yTot,
       preFl:preFl,preAc:preAc,preLv:preLv,mainFl:mainFl,mainAc:mainAc,mainLv:mainLv,
       k:k,Tafter:Tafter,Tmix:Tmix,Tw:Tw,Tres:Tres,Tmain:Tmain,Tcap:Tcap,
       bake:t0+(preMin+after)*60000,want:want,ideal:want-(preMin+after)*60000,leadMin:preMin+after,
@@ -382,7 +383,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
       foldOn:hoursY>20,nChk:hoursY>36?2:1,yPct:yPct,fl:fl,ac:ac,sa:fl*0.025,ol:fl*P.olio/100,lv:fl*yPct/100,
       room:room,flT:flT,tgt:tgt,fric:fric,fr:fr,r2:r2,pT:pT,outMin:outMin,proofMin:proofMin,k:k,Tafter:Tafter,Tmix:Tmix,Tw:Tw,Tres:Tres,Tmain:Tmain};
   }
-  const FZ=['yPct','fl','ac','sa','ol','lv','Tw','Tres','Tmain','Tafter','Tmix','k','room','flT','tgt','fric','foldOn','nChk','total','n','g','idr','N','capG','hoursY','ma','preFl','preAc','preLv','preY','mainFl','mainAc','mainLv'];
+  const FZ=['butter','fatP','yPct','fl','ac','sa','ol','lv','Tw','Tres','Tmain','Tafter','Tmix','k','room','flT','tgt','fric','foldOn','nChk','total','n','g','idr','N','capG','hoursY','ma','preFl','preAc','preLv','preY','mainFl','mainAc','mainLv'];
 
   /* ---- Lievitazione stimata dalle temperature registrate ----
      L'impasto si scalda o si raffredda verso l'ambiente con una costante di circa 3,2 ore (vaschetta da 5 kg,
@@ -442,7 +443,8 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     if(!pre&&!P.cassetta)st('i3','impasto','Autolisi','Ferma la macchina, copri la vasca e lascia riposare 20 minuti.',20,T);
     st('i4','impasto','Aggiungi il lievito','Sciogli '+gr1(r.mainLv/N)+' di lievito fresco in metà dell\'acqua tenuta da parte ('+tr+' °C) e versalo. Impasta 3 minuti.',3,T);
     st('i5','impasto',P.cassetta?'Aggiungi sale e zucchero':'Aggiungi sale e malto','Versa '+gr(r.sa/N)+' di sale e '+gr(r.ma/N)+(P.cassetta?' di zucchero':' di malto (o zucchero)')+' sciolti nel resto dell\'acqua. Impasta 4-5 minuti fino ad assorbimento.',5,{timer:true,note:P.cassetta?'Lo zucchero rende la mollica più tenera e colora la crosta.':'Il malto aiuta la crosta a colorarsi anche a bassa temperatura.'});
-    st('i6','impasto','Olio e incordatura','Versa '+gr(r.ol/N)+' di olio a filo'+(P.cassetta?', poco alla volta, aspettando che ogni aggiunta sia assorbita,':'')+' e continua 3-6 minuti, finché l\'impasto si stacca dalla vasca.',P.cassetta?8:6,{timer:true,anim:'veil',note:'Fai la prova del velo: se si strappa subito, lavora ancora 1-2 minuti.'});
+    if(r.butter)st('i6','impasto','Burro e incordatura','Aggiungi '+gr(r.ol/N)+' di burro morbido, a temperatura ambiente, a pezzetti: un pezzo alla volta, aspettando che sia assorbito prima del successivo. Continua finché l\'impasto è liscio, lucido e si stacca dalla vasca.',10,{timer:true,anim:'veil',note:'Il burro va messo solo quando l\'impasto è già incordato: all\'inizio impedirebbe al glutine di formarsi. Tiralo fuori dal frigo un\'ora prima.'});
+    else st('i6','impasto','Olio e incordatura','Versa '+gr(r.ol/N)+' di olio a filo'+(P.cassetta?', poco alla volta, aspettando che ogni aggiunta sia assorbita,':'')+' e continua 3-6 minuti, finché l\'impasto si stacca dalla vasca.',P.cassetta?8:6,{timer:true,anim:'veil',note:'Fai la prova del velo: se si strappa subito, lavora ancora 1-2 minuti.'});
     st('i7','impasto','Misura la temperatura','Termometro al centro dell\'impasto. Obiettivo '+t1(r.tgt)+' °C, va bene da '+t1(r.tgt-1)+' a '+t1(r.tgt+1)+' °C.',1,{meas:true});
     const half=Math.round(r.bulkMin/2/5)*5;
     st('b1','lievitazione','Puntata','Metti l\'impasto in '+vn+(vn>1?' vaschette unte':' vaschetta unta')+', coperto, a '+t1(r.bulkT)+' °C (cella di lievitazione).',half,T);
@@ -541,7 +543,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
       '<tr><td colspan="'+(multi?3:2)+'"><b>Impasto finale</b></td></tr>';
     const mk=r.P.milk?r.mainAc*r.P.milk/100:0;
     h+=row('Farina Rebelde','',r.mainFl,gr)+row('Acqua',Math.round(clamp(r.Tmain,0,60))+' °C la parte principale, '+Math.round(clamp(r.Tres,0,30))+' °C quella tenuta da parte',r.mainAc-mk,gr)+(mk?row('Latte','alla stessa temperatura dell\'acqua',mk,gr):'')+
-      row('Sale','2%',r.sa,gr)+(r.P.cassetta?row('Zucchero',r.P.malto+'%',r.ma,gr):row('Malto o zucchero','1%',r.ma,gr))+row('Olio EVO',r.P.olio+'%',r.ol,gr)+row('Lievito fresco',(Math.round(r.P.yMain*100)/100).toLocaleString('it-IT')+'%',r.mainLv,gr1)+'</tbody></table>';
+      row('Sale','2%',r.sa,gr)+(r.P.cassetta?row('Zucchero',r.P.malto+'%',r.ma,gr):row('Malto o zucchero','1%',r.ma,gr))+(r.butter?row('Burro','7%, morbido',r.ol,gr):row('Olio EVO',(r.fatP||r.P.olio)+'%',r.ol,gr))+row('Lievito fresco',(Math.round(r.P.yMain*100)/100).toLocaleString('it-IT')+'%',r.mainLv,gr1)+'</tbody></table>';
     h+='<div class="pills"><div class="pill"><b>'+t1(r.total/1000)+' kg</b><span>impasto</span></div><div class="pill"><b>'+r.n+' × '+Math.round(r.g)+'</b><span>'+(r.P.cassetta?'stampi':'filoni')+' × grammi</span></div><div class="pill"><b>'+Math.round(r.idr*100)+'%</b><span>'+(r.P.milk?'acqua e latte':'acqua totale')+'</span></div></div>';
     return h;
   }
@@ -860,7 +862,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
       '<optgroup label="Pane">'+Object.keys(PRODUCTS).filter(isPane).map(k=>'<option value="'+k+'"'+(S.prod===k?' selected':'')+'>'+PRODUCTS[k].name+'</option>').join('')+'</optgroup>'+
       SOON.map(g=>'<optgroup label="'+g[0]+'">'+g[1].map(n=>'<option disabled>'+n+' (in arrivo)</option>').join('')+'</optgroup>').join('')+
       '</select></label><p class="msg">'+PRODUCTS[S.prod].d+'</p>',der:()=>''},
-    {html:r=>r.pane?'<h1>'+(r.P.cassetta?'Quanti stampi?':'Quanti filoni?')+'</h1><div class="grid">'+fld(r.P.cassetta?'Numero di stampi':'Numero di filoni','n',S.n,'min="1" max="100" step="1" inputmode="numeric"')+fld(r.P.cassetta?'Impasto per stampo (g)':'Peso a filone (g)','g',S.g,'min="100" step="10" inputmode="numeric"',r.P.g)+fld('Acqua (% sulla farina)','idr',S.idr,'min="55" max="78" step="1" inputmode="numeric"',r.P.idr)+'</div><div id="der" class="stack"></div>':
+    {html:r=>r.pane?'<h1>'+(r.P.cassetta?'Quanti stampi?':'Quanti filoni?')+'</h1>'+(r.P.cassetta?'<div class="chips"><button type="button" class="chip'+(S.fat!=='olio'?' on':'')+'" data-fat="burro"><b>Burro</b><span>Classico: mollica fine, profumo di pancarrè</span></button><button type="button" class="chip'+(S.fat==='olio'?' on':'')+'" data-fat="olio"><b>Olio</b><span>Più leggero, sapore neutro</span></button></div>':'')+'<div class="grid">'+fld(r.P.cassetta?'Numero di stampi':'Numero di filoni','n',S.n,'min="1" max="100" step="1" inputmode="numeric"')+fld(r.P.cassetta?'Impasto per stampo (g)':'Peso a filone (g)','g',S.g,'min="100" step="10" inputmode="numeric"',r.P.g)+fld('Acqua (% sulla farina)','idr',S.idr,'min="55" max="78" step="1" inputmode="numeric"',r.P.idr)+'</div><div id="der" class="stack"></div>':
       '<h1>Quanta ne fai?</h1><div class="grid">'+fld('Numero di teglie','n',S.n,'min="1" max="60" step="1" inputmode="numeric"')+
       '<label>Formato teglia<select data-k="fmt" data-rr><option value="60"'+(S.fmt==='60'?' selected':'')+'>60×40 cm</option><option value="46"'+(S.fmt==='46'?' selected':'')+'>46×33 cm</option><option value="altro"'+(S.fmt==='altro'?' selected':'')+'>Altro</option></select></label>'+
       fld('Impasto per teglia (g)','g',S.g,'min="100" step="10" inputmode="numeric"',Math.round(S.fmt==='altro'?800:r.P.w[S.fmt]))+
@@ -1165,7 +1167,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   function complete(id){SES.done[id]=Date.now();if(id==='out'&&!isOut(SES))addLog(SES,{k:'out',amb:num(SES.inp.room2,18)});saveSes();render()}
   function readT(){const d=$('tD'),a=$('tA'),e={};if(d&&d.value!==''&&isFinite(+d.value))e.dough=+d.value;if(a&&a.value!==''&&isFinite(+a.value))e.amb=+a.value;return e}
   document.addEventListener('click',e=>{
-    const t=e.target.closest('[data-act],[data-tab],[data-toggle],[data-mixer],[data-open],[data-ans],[data-rate],[data-place],[data-hist]');if(!t)return;
+    const t=e.target.closest('[data-act],[data-tab],[data-toggle],[data-mixer],[data-fat],[data-open],[data-ans],[data-rate],[data-place],[data-hist]');if(!t)return;
     if(t.dataset.ans&&SES){
       const [sid,q,i]=t.dataset.ans.split('|'),k=sid+':'+q;SES.q=SES.q||{};
       if(SES.q[k]===+i)delete SES.q[k];else{SES.q[k]=+i;const o=QDEF[q].o[+i];if(q==='vol'&&o[3]!=null)addLog(SES,{k:'v',v:o[3]})}
@@ -1176,6 +1178,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     if(t.dataset.hist!=null){histSel=+t.dataset.hist;screen='hitem';confirmEnd=false;render();$('view').scrollTop=0;return}
     const a=t.dataset.act;
     if(t.dataset.open){SES=ALL[+t.dataset.open]||null;view='now';confirmEnd=false;render();$('view').scrollTop=0;return}
+    if(t.dataset.fat){S.fat=t.dataset.fat;saveS();render();return}
     if(t.dataset.mixer){S.mixer=t.dataset.mixer;S.cap=MIXERS[S.mixer].cap;S.fric='';saveS();render();return}
     if(t.dataset.tab){sumTab=t.dataset.tab;confirmEnd=false;render();$('view').scrollTop=0;return}
     if(t.dataset.toggle){const id=t.dataset.toggle;if(SES.done[id])delete SES.done[id];else SES.done[id]=Date.now();saveSes();render();return}
