@@ -264,7 +264,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   const saveS=()=>store.set('lv-set',S);
   const saveSes=()=>store.set('lv-all',ALL);
 
-  const VERSION='22/11 11:45';
+  const VERSION='22/11 11:55';
   const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
   /* ---- I tuoi posti: dove sta l'impasto, con la temperatura tipica. c = posto freddo (frigo, cella) ---- */
@@ -455,11 +455,11 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     st('f2','forma','Riposo dei pezzi','Lasciali coperti 15 minuti: si rilassano e poi si allungano senza strapparsi.',15,T);
     if(P.cassetta)st('pf','forma','Forma e metti negli stampi','Stendi ogni pezzo in un rettangolo lungo quanto lo stampo, arrotolalo stretto dal lato corto e chiudi bene la giuntura. Mettilo nello stampo con la giuntura sotto e premi leggermente perché arrivi agli angoli.',10,{note:'In alternativa dividi ogni pezzo in 3 palline uguali e mettile una accanto all\'altra: viene più alto e regolare.'});
     else st('pf','forma','Forma i filoni','Schiaccia ogni pezzo in un rettangolo, arrotolalo stretto dal lato lungo premendo con i pollici, chiudi bene la giuntura e allunga rotolando con i palmi fino a 30 cm circa. Su teglia con carta forno, giuntura sotto, distanziati.',10);
-    if(P.cassetta)st('proof','forma','Lievitazione negli stampi','In cella a '+t1(r.finT)+' °C, modalità umida, stampi aperti, per circa '+r.finMin+' minuti. Accendi il forno a 180 °C statico 30 minuti prima.',r.finMin,{timer:true,note:'Pronto quando l\'impasto arriva a 1 cm dal bordo dello stampo. Allora chiudi il coperchio. Se lo cuoci senza coperchio, aspetta che superi il bordo di 1-2 cm.'});
+    if(P.cassetta)st('proof','forma','Lievitazione negli stampi','In cella a '+t1(r.finT)+' °C, modalità umida, stampi aperti, per circa '+r.finMin+' minuti. Accendi il forno a 180 °C statico 30 minuti prima.',r.finMin,{timer:true,note:'Pronto quando l\'impasto arriva a 1 cm dal bordo dello stampo. Allora chiudi il coperchio. Se lo cuoci senza coperchio, aspetta che superi il bordo di 1-2 cm e spennellalo delicatamente con burro fuso tiepido (o latte) appena prima di infornare.'});
     else st('proof','forma','Lievitazione finale','In cella a '+t1(r.finT)+' °C, modalità umida, per circa '+r.finMin+' minuti. Accendi il forno a 175 °C statico (o 165 °C ventilato) 30 minuti prima.',r.finMin,{timer:true,anim:'poke',note:'Pronti quando sono quasi raddoppiati e l\'impronta del dito torna su piano piano. Per una crosta più morbida e lucida spennellali con un po\' di latte o un filo d\'olio.'});
     if(P.cassetta)st('cuoci','forno','Cuoci il pane in cassetta','180 °C statico, stampi chiusi col coperchio, 35-40 minuti. Cotto quando la sonda al cuore segna 95-96 °C.',38,{timer:true,note:'Negli ultimi 5 minuti puoi togliere il coperchio per controllare il colore.'});
     else st('cuoci','forno','Cuoci i filoni','175 °C statico, senza vapore, 35-40 minuti. Sono cotti quando la sonda al cuore segna 96-98 °C, o battendo sotto suonano vuoto.',38,{timer:true,note:'Se si colorano troppo presto, abbassa a 165 °C. Più alta è la temperatura, più la crosta diventa dura.'});
-    if(P.cassetta)st('telo','forno','Sforma e fai raffreddare','Togli subito il pane dagli stampi e mettilo su una griglia, coperto con un telo, così la crosta resta morbida. Taglialo solo da freddo, dopo almeno un\'ora.',0);
+    if(P.cassetta)st('telo','forno','Sforma, spennella e fai raffreddare','Togli subito il pane dagli stampi, spennella tutta la superficie con '+(r.butter?'burro fuso':'un filo d\'olio')+' finché è caldo e mettilo su una griglia coperto con un telo: la crosta resta morbida e lucida. Taglialo solo da freddo, dopo almeno un\'ora.',0,{note:'Bastano 20-30 g di '+(r.butter?'burro fuso':'olio')+' per tutti gli stampi.'});
     else st('telo','forno','Copri i filoni con un telo','Appena sfornati coprili con un telo pulito mentre raffreddano: il vapore ammorbidisce la crosta. Non tagliarli prima di 30 minuti.',0);
     const done=ses?ses.done:{},now=Date.now();let t=t0;
     L.forEach(s=>{
