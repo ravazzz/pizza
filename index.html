@@ -137,6 +137,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
 .hcard b{font-family:var(--display);font-size:1.25rem;font-weight:800;line-height:1.05;display:block}
 .stars{color:var(--ember);font-weight:700;letter-spacing:.05em}
 .plrow{display:grid;grid-template-columns:1fr 80px auto auto;gap:8px;align-items:center;background:var(--surface);border-radius:12px;padding:8px}
+.tin{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;width:100%}
 .plrow input[type=text]{font:inherit;font-weight:600;color:var(--ink);background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px;width:100%}
 .plrow input[type=number]{padding:10px}
 .mini{font-size:.82rem;color:var(--muted);display:flex;align-items:center;gap:4px}
@@ -189,8 +190,13 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     'pane-poolish':{type:'pane',pre:'poolish',name:'Filone morbido · poolish',d:'Poolish il giorno prima, 15 ore circa. Più profumo, resta morbido più a lungo.',idr:65,olio:3,malto:1,tgt:25,yMain:0.5,bulk:60,g:450,w:{},preF:40,preIdr:100,preY0:0.1,preH0:15,preT0:20,preT:18,preH:15},
     'pane-biga':{type:'pane',pre:'biga',name:'Filone morbido · biga',d:'Biga il giorno prima, 16 ore circa. Mollica più strutturata, sapore più pieno.',idr:62,olio:3,malto:1,tgt:25,yMain:0.3,bulk:60,g:450,w:{},preF:50,preIdr:44,preY0:1,preH0:16,preT0:18,preT:18,preH:16}
   };
-    /* Pane in cassetta: diretto, liquidi metà acqua e metà latte, 4% zucchero, 6% olio, cottura in stampo con coperchio */
-  PANE['pane-cassetta']={type:'pane',cassetta:true,name:'Pane in cassetta',d:'Pancarrè morbido con latte e burro (o olio). Si fa in giornata, circa 4 ore. In stampo chiuso viene a fette quadrate, in stampo aperto con la cupola dorata.',idr:62,milk:50,olio:6,malto:4,tgt:26,yMain:2,bulk:60,fin:60,g:800,w:{}};
+    /* Pane in cassetta ricco, sulle proporzioni di A. Sorrentino (Scatti di Gusto): liquidi circa 56% (3/4 latte), burro 20%, zucchero 5%,
+       circa 1 kg per stampo 32×10×10, 190 °C per 40-45 min. Sale tenuto al 2,5% (lui arriva al 3%). */
+  PANE['pane-cassetta']={type:'pane',cassetta:true,name:'Pane in cassetta',d:'Pancarrè ricco, con latte e tanto burro (o olio). Si fa in giornata, circa 4 ore e mezza. In stampo chiuso viene a fette quadrate, in stampo aperto con la cupola dorata.',idr:56,milk:75,olio:0,burro:20,olioAlt:8,malto:5,sale:2.5,tgt:26,yMain:2,bulk:60,fin:75,g:950,w:{}};
+  /* Ricette incollate dall'utente: salvate solo nel telefono */
+  let MINE=store.get('lv-ric')||[];
+  const saveMine=()=>store.set('lv-ric',MINE);
+  MINE.forEach(p=>{PANE[p.key]=p});
   Object.assign(PRODUCTS,PANE);
   const isPane=k=>!!(PRODUCTS[k]&&PRODUCTS[k].type==='pane');
   const SOON=[['Altro pane',['Pane di grano duro','Ciabatta']],['Grandi lievitati',['Panettone','Colomba','Focaccia veneta']],['Dolci',['Brioche','Krapfen']]];
@@ -264,7 +270,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   const saveS=()=>store.set('lv-set',S);
   const saveSes=()=>store.set('lv-all',ALL);
 
-  const VERSION='22/11 12:10';
+  const VERSION='22/11 12:40';
   const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
   /* ---- I tuoi posti: dove sta l'impasto, con la temperatura tipica. c = posto freddo (frigo, cella) ---- */
@@ -286,7 +292,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     poke:{q:'Prova del dito',o:[['Torna su subito',null,'Aspetta altri 10-15 minuti e rifai la prova.'],['Torna su piano piano',null,'Pronta: condisci e inforna.'],['Non torna su',null,'Troppo lievitata: inforna subito.']]}
   };
   const QMAP=s=>s.id==='out'||/^chk/.test(s.id)?['vol','bub']:(s.id==='stendi'||s.id==='pf')?['ext']:(s.id==='proof'||s.id==='pforno')?['poke']:
-    s.h==='In vaschetta e pieghe'?['surf','hold']:(s.h==='Olio e incordatura'||s.h==='Seconda velocità')?['velo','stick']:/piega/i.test(s.h)?['surf']:[];
+    s.h==='In vaschetta e pieghe'?['surf','hold']:(s.h==='Olio e incordatura'||s.h==='Burro e incordatura'||s.h==='Incordatura'||s.h==='Seconda velocità')?['velo','stick']:/piega/i.test(s.h)?['surf']:[];
   function strength(ses){
     let sum=0,n=0;
     Object.keys(ses.q||{}).forEach(k=>{const o=QDEF[k.split(':')[1]];const v=o&&o.o[ses.q[k]];if(v&&v[1]!=null){sum+=v[1];n++}});
@@ -332,9 +338,10 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     const r5=x=>Math.round(x/5)*5;
     const bulkMin=r5(clamp(P.bulk*fRate(25)/fRate(bulkT),30,300)),finMin=r5(clamp((P.fin||50)*fRate(30)/fRate(finT),30,180));
     const preY=P.pre?clamp(P.preY0*Math.pow(P.preH0/preH,1.1)*fRate(P.preT0)/fRate(preT),P.pre==='biga'?0.2:0.02,P.pre==='biga'?3:1):0;
-    const butter=!!(P.cassetta&&inp.fat!=='olio'),fatP=butter?7:P.olio;
+    const buP=P.custom?(P.burro||0):P.cassetta?(inp.fat!=='olio'?P.burro:0):0,olP=P.custom?(P.olio||0):P.cassetta?(inp.fat!=='olio'?0:P.olioAlt):P.olio;
+    const butter=buP>0,fatP=buP+olP,saP=(P.sale||2)/100,uoP=(P.uova||0)/100;
     const yTot=P.yMain+(P.pre?preY*P.preF/100:0);
-    const fl=total/(1+idr+0.02+fatP/100+P.malto/100+yTot/100),ac=fl*idr;
+    const fl=total/(1+idr+saP+fatP/100+uoP+P.malto/100+yTot/100),ac=fl*idr;
     const preFl=P.pre?fl*P.preF/100:0,preAc=P.pre?preFl*P.preIdr/100:0,preLv=preFl*preY/100,mainFl=fl-preFl,mainAc=ac-preAc,mainLv=fl*P.yMain/100;
     const kgB=total/N/1000,k=clamp(0.4/Math.sqrt(kgB),0.06,0.25);
     const Cf=mainFl/N/1000*1.7,Cw=mainAc/N/1000*4.18,Cp=(preFl*1.7+preAc*4.18)/N/1000,Cv=mx.cv;
@@ -343,12 +350,12 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     /* acqua oltre 40 °C non si usa: si mette a 40 e si stima la temperatura che avrà l'impasto */
     if(Tw>40){Tw=40;const tm=(Cf*flT+Cv*room+Cp*preT+Cw*40)/(Cf+Cw+Cv+Cp),ta=tm+fric;Tcap=ta+k*(room-ta)}
     const Tres=Tw>30?28:Tw,Tmain=Tcap!=null?40:(Tw-0.08*Tres)/0.92;
-    const mixMin=(P.pre||P.cassetta?0:20)+3+4+3+5+6+1+15,shapeMin=10+15+10;
+    const mixMin=(P.pre||P.cassetta||P.custom?0:20)+3+4+3+5+6+1+15,shapeMin=10+15+10;
     const after=mixMin+(N-1)*mx.work+bulkMin+5+shapeMin+finMin,preMin=P.pre?5+preH*60:0;
     const want=new Date(inp.bake).getTime();
     return {pane:true,P:P,mx:mx,n:n,g:g,idr:idr,total:total,capG:capG,N:N,room:room,flT:flT,tgt:tgt,fric:fric,
       preT:preT,preH:preH,bulkT:bulkT,finT:finT,bulkMin:bulkMin,finMin:finMin,preY:preY,
-      fl:fl,ac:ac,sa:fl*0.02,ol:fl*fatP/100,butter:butter,fatP:fatP,lid:!!(P.cassetta&&inp.lid!=='aperto'),ma:fl*P.malto/100,lv:mainLv+preLv,yPct:yTot,
+      fl:fl,ac:ac,sa:fl*saP,ol:fl*olP/100,bu:fl*buP/100,uo:fl*uoP,butter:butter,fatP:fatP,lid:!!(P.cassetta&&inp.lid!=='aperto'),ma:fl*P.malto/100,lv:mainLv+preLv,yPct:yTot,
       preFl:preFl,preAc:preAc,preLv:preLv,mainFl:mainFl,mainAc:mainAc,mainLv:mainLv,
       k:k,Tafter:Tafter,Tmix:Tmix,Tw:Tw,Tres:Tres,Tmain:Tmain,Tcap:Tcap,
       bake:t0+(preMin+after)*60000,want:want,ideal:want-(preMin+after)*60000,leadMin:preMin+after,
@@ -383,7 +390,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
       foldOn:hoursY>20,nChk:hoursY>36?2:1,yPct:yPct,fl:fl,ac:ac,sa:fl*0.025,ol:fl*P.olio/100,lv:fl*yPct/100,
       room:room,flT:flT,tgt:tgt,fric:fric,fr:fr,r2:r2,pT:pT,outMin:outMin,proofMin:proofMin,k:k,Tafter:Tafter,Tmix:Tmix,Tw:Tw,Tres:Tres,Tmain:Tmain};
   }
-  const FZ=['butter','fatP','lid','yPct','fl','ac','sa','ol','lv','Tw','Tres','Tmain','Tafter','Tmix','k','room','flT','tgt','fric','foldOn','nChk','total','n','g','idr','N','capG','hoursY','ma','preFl','preAc','preLv','preY','mainFl','mainAc','mainLv'];
+  const FZ=['bu','uo','butter','fatP','lid','yPct','fl','ac','sa','ol','lv','Tw','Tres','Tmain','Tafter','Tmix','k','room','flT','tgt','fric','foldOn','nChk','total','n','g','idr','N','capG','hoursY','ma','preFl','preAc','preLv','preY','mainFl','mainAc','mainLv'];
 
   /* ---- Lievitazione stimata dalle temperature registrate ----
      L'impasto si scalda o si raffredda verso l'ambiente con una costante di circa 3,2 ore (vaschetta da 5 kg,
@@ -423,9 +430,16 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   }
   function addLog(ses,e){ses.log=ses.log||[];e.t=Date.now();ses.log.push(e);saveSes()}
 
+  /* Cottura: dalla ricetta incollata, oppure dai valori della ricetta di base */
+  function bakeOf(r){
+    const P=r.P;
+    if(P.custom&&P.bakeT)return {T:P.bakeT,m:P.bakeM||35,txt:(P.bakeM||35)+' minuti circa'};
+    if(P.cassetta)return r.lid?{T:190,m:42,txt:'40-45 minuti'}:{T:180,m:37,txt:'35-40 minuti'};
+    return {T:175,m:38,txt:'35-40 minuti'};
+  }
   function buildPane(inp,t0,ses){
     const r=compute(inp,t0);
-    if(ses&&ses.fz)FZ.forEach(k=>{if(ses.fz[k]!==undefined)r[k]=ses.fz[k]});
+    if(ses&&ses.fz){FZ.forEach(k=>{if(ses.fz[k]!==undefined)r[k]=ses.fz[k]});if(ses.fz.bu===undefined){r.bu=r.butter?r.ol:0;if(r.butter)r.ol=0;r.uo=0}}
     const P=r.P,N=r.N,res=Math.round(r.mainAc/N*0.08/10)*10,pre=P.pre,PN=pre==='biga'?'biga':'poolish',vn=Math.max(1,Math.ceil(r.total/6000));
     const tm=Math.round(clamp(r.Tmain,0,60)),tr=Math.round(clamp(r.Tres,0,30)),nF=r.n;
     const L=[],T={timer:true},st=(id,phase,h,p,dur,o)=>L.push(Object.assign({id:id,phase:phase,h:h,p:p,dur:dur,timer:false},o||{}));
@@ -437,28 +451,33 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
       st('pw','pre','Biga in maturazione','Niente da fare: la biga lavora da sola.',0,{waitH:r.preH,note:'È pronta quando è gonfia, profuma di yogurt e frutta e, aprendola, dentro è piena di filamenti.'});
     }
     const lot=N>1?' per lotto':'';
-    const milk=P.milk?r.mainAc*P.milk/100:0,liq=P.milk?gr((r.mainAc-milk)/N-res)+' di acqua e '+gr(milk/N)+' di latte, insieme a '+tm+' °C':gr(r.mainAc/N-res)+' di acqua a '+tm+' °C';
-    st('i1','impasto','Carica la vasca','Metti '+liq+(pre?', poi '+(pre==='biga'?'la biga spezzettata':'il poolish')+' ('+gr((r.preFl+r.preAc)/N)+')':'')+' e '+gr(r.mainFl/N)+' di farina'+lot+'.',3,{note:'Tieni da parte '+gr(res)+' di acqua a '+tr+' °C per lievito e sale.'+(pre==='biga'?' Con la biga l\'impasto è duro all\'inizio: se serve, aggiungi l\'acqua tenuta da parte un po\' alla volta mentre gira.':'')});
+    const milk=P.milk?r.mainAc*P.milk/100:0,wat=(r.mainAc-milk)/N,rM=P.milk&&wat<res,rl=rM?'latte':'acqua';
+    const liq=P.milk?(wat-(rM?0:res)>=1?gr(wat-(rM?0:res))+' di acqua e ':'')+gr(milk/N-(rM?res:0))+' di latte, insieme a '+tm+' °C':gr(r.mainAc/N-res)+' di acqua a '+tm+' °C';
+    const egg=r.uo>0?', '+gr(r.uo/N)+' di uova sbattute':'',sug=P.cassetta||P.custom,bk=bakeOf(r);
+    st('i1','impasto','Carica la vasca','Metti '+liq+egg+(pre?', poi '+(pre==='biga'?'la biga spezzettata':'il poolish')+' ('+gr((r.preFl+r.preAc)/N)+')':'')+' e '+gr(r.mainFl/N)+' di farina'+lot+'.',3,{note:'Tieni da parte '+gr(res)+' di '+rl+' a '+tr+' °C per lievito e sale.'+(pre==='biga'?' Con la biga l\'impasto è duro all\'inizio: se serve, aggiungi l\'acqua tenuta da parte un po\' alla volta mentre gira.':'')});
     st('i2','impasto','Mescola per amalgamare','Velocità unica, 4 minuti, finché non c\'è più farina asciutta.',4,T);
     if(!pre&&!P.cassetta)st('i3','impasto','Autolisi','Ferma la macchina, copri la vasca e lascia riposare 20 minuti.',20,T);
-    st('i4','impasto','Aggiungi il lievito','Sciogli '+gr1(r.mainLv/N)+' di lievito fresco in metà dell\'acqua tenuta da parte ('+tr+' °C) e versalo. Impasta 3 minuti.',3,T);
-    st('i5','impasto',P.cassetta?'Aggiungi sale e zucchero':'Aggiungi sale e malto','Versa '+gr(r.sa/N)+' di sale e '+gr(r.ma/N)+(P.cassetta?' di zucchero':' di malto (o zucchero)')+' sciolti nel resto dell\'acqua. Impasta 4-5 minuti fino ad assorbimento.',5,{timer:true,note:P.cassetta?'Lo zucchero rende la mollica più tenera e colora la crosta.':'Il malto aiuta la crosta a colorarsi anche a bassa temperatura.'});
-    if(r.butter)st('i6','impasto','Burro e incordatura','Aggiungi '+gr(r.ol/N)+' di burro morbido, a temperatura ambiente, a pezzetti: un pezzo alla volta, aspettando che sia assorbito prima del successivo. Continua finché l\'impasto è liscio, lucido e si stacca dalla vasca.',10,{timer:true,anim:'veil',note:'Il burro va messo solo quando l\'impasto è già incordato: all\'inizio impedirebbe al glutine di formarsi. Tiralo fuori dal frigo un\'ora prima.'});
+    st('i4','impasto','Aggiungi il lievito','Sciogli '+gr1(r.mainLv/N)+' di lievito fresco in metà del'+(rM?' latte tenuto':'l\'acqua tenuta')+' da parte ('+tr+' °C) e versalo. Impasta 3 minuti.',3,T);
+    if(P.custom&&!(r.ma>0))st('i5','impasto','Aggiungi il sale','Versa '+gr(r.sa/N)+' di sale sciolto nel resto del'+(rM?' latte':'l\'acqua')+'. Impasta 4-5 minuti fino ad assorbimento.',5,T);
+    else st('i5','impasto',sug?'Aggiungi sale e zucchero':'Aggiungi sale e malto','Versa '+gr(r.sa/N)+' di sale e '+gr(r.ma/N)+(sug?' di zucchero':' di malto (o zucchero)')+' sciolti nel resto del'+(rM?' latte':'l\'acqua')+'. Impasta 4-5 minuti fino ad assorbimento.',5,{timer:true,note:sug?'Lo zucchero rende la mollica più tenera e colora la crosta.':'Il malto aiuta la crosta a colorarsi anche a bassa temperatura.'});
+    const bigB=r.bu>r.fl*0.12;
+    if(r.bu>0)st('i6','impasto','Burro e incordatura','Aggiungi '+gr(r.bu/N)+' di burro morbido, a temperatura ambiente, a pezzetti'+(r.ol>0?' (e '+gr(r.ol/N)+' di olio)':'')+': un pezzo alla volta, aspettando che sia assorbito prima del successivo. Continua finché l\'impasto è liscio, lucido e si stacca dalla vasca.',bigB?15:10,{timer:true,anim:'veil',note:'Il burro va messo solo quando l\'impasto è già incordato: all\'inizio impedirebbe al glutine di formarsi. Tiralo fuori dal frigo un\'ora prima.'+(bigB?' Con tanto burro ci vogliono 10-15 minuti: se l\'impasto supera i 27 °C fermati qualche minuto.':'')});
+    else if(P.custom&&!(r.ol>0))st('i6','impasto','Incordatura','Continua a impastare 4-6 minuti, finché l\'impasto si stacca dalla vasca ed è liscio.',6,{timer:true,anim:'veil',note:'Fai la prova del velo: se si strappa subito, lavora ancora 1-2 minuti.'});
     else st('i6','impasto','Olio e incordatura','Versa '+gr(r.ol/N)+' di olio a filo'+(P.cassetta?', poco alla volta, aspettando che ogni aggiunta sia assorbita,':'')+' e continua 3-6 minuti, finché l\'impasto si stacca dalla vasca.',P.cassetta?8:6,{timer:true,anim:'veil',note:'Fai la prova del velo: se si strappa subito, lavora ancora 1-2 minuti.'});
     st('i7','impasto','Misura la temperatura','Termometro al centro dell\'impasto. Obiettivo '+t1(r.tgt)+' °C, va bene da '+t1(r.tgt-1)+' a '+t1(r.tgt+1)+' °C.',1,{meas:true});
     const half=Math.round(r.bulkMin/2/5)*5;
     st('b1','lievitazione','Puntata','Metti l\'impasto in '+vn+(vn>1?' vaschette unte':' vaschetta unta')+', coperto, a '+t1(r.bulkT)+' °C (cella di lievitazione).',half,T);
     st('b2','lievitazione','Giro di pieghe','Con le mani bagnate tira un lembo verso l\'alto e ripiegalo sul centro, gira di un quarto e ripeti: 4 pieghe. Ricopri.',2,{anim:'fold'});
     st('b3','lievitazione','Puntata, seconda parte','Ancora '+(r.bulkMin-half)+' minuti a '+t1(r.bulkT)+' °C.',r.bulkMin-half,{timer:true,note:'Deve crescere di circa la metà e mostrare bolle ai lati.'});
-    if(P.cassetta)st('f1','forma','Ungi gli stampi e dividi','Ungi bene stampi e coperchi. Rovescia l\'impasto sul piano leggermente unto e taglia '+nF+' pezzi da '+gr(r.g)+' (pesali). Arrotondali e copri con un telo.',10,{note:'Peso giusto per uno stampo da 30×10×10 cm con coperchio: 750-800 g. Per altri stampi conta circa 0,25 g per cm³ di volume.'});
+    if(P.cassetta)st('f1','forma','Ungi gli stampi e dividi','Ungi bene stampi e coperchi. Rovescia l\'impasto sul piano leggermente unto e taglia '+nF+' pezzi da '+gr(r.g)+' (pesali). Arrotondali e copri con un telo.',10,{note:'Peso giusto per uno stampo da 30×10×10 cm: circa 950 g (Sorrentino ne mette 1 kg nel 32×10×10). Per altri stampi conta circa 0,3 g per cm³ di volume.'});
     else st('f1','forma','Dividi e preforma','Rovescia sul piano leggermente infarinato. Taglia '+nF+' pezzi da '+gr(r.g)+' (pesali). Arrotola ogni pezzo in un cilindro corto, giuntura sotto, e copri con un telo.',10,{note:'Usa poca farina: troppa impedisce di chiudere bene i filoni.'});
     st('f2','forma','Riposo dei pezzi','Lasciali coperti 15 minuti: si rilassano e poi si allungano senza strapparsi.',15,T);
     if(P.cassetta)st('pf','forma','Forma e metti negli stampi','Stendi ogni pezzo in un rettangolo lungo quanto lo stampo, arrotolalo stretto dal lato corto e chiudi bene la giuntura. Mettilo nello stampo con la giuntura sotto e premi leggermente perché arrivi agli angoli.',10,{note:'In alternativa dividi ogni pezzo in 3 palline uguali e mettile una accanto all\'altra: viene più alto e regolare.'});
     else st('pf','forma','Forma i filoni','Schiaccia ogni pezzo in un rettangolo, arrotolalo stretto dal lato lungo premendo con i pollici, chiudi bene la giuntura e allunga rotolando con i palmi fino a 30 cm circa. Su teglia con carta forno, giuntura sotto, distanziati.',10);
-    if(P.cassetta)st('proof','forma','Lievitazione negli stampi','In cella a '+t1(r.finT)+' °C, modalità umida, stampi aperti, per circa '+r.finMin+' minuti. Accendi il forno a '+(r.lid?'180':'175')+' °C statico 30 minuti prima.',r.finMin,{timer:true,note:r.lid?'Pronto quando l\'impasto arriva a 1 cm dal bordo dello stampo: allora chiudi il coperchio e inforna. Non aspettare di più, o il coperchio schiaccia l\'impasto.':'Pronto quando l\'impasto supera il bordo di 1-2 cm. Spennellalo delicatamente con '+(r.butter?'burro fuso tiepido':'un filo d\'olio')+' (o latte) appena prima di infornare.'});
-    else st('proof','forma','Lievitazione finale','In cella a '+t1(r.finT)+' °C, modalità umida, per circa '+r.finMin+' minuti. Accendi il forno a 175 °C statico (o 165 °C ventilato) 30 minuti prima.',r.finMin,{timer:true,anim:'poke',note:'Pronti quando sono quasi raddoppiati e l\'impronta del dito torna su piano piano. Per una crosta più morbida e lucida spennellali con un po\' di latte o un filo d\'olio.'});
-    if(P.cassetta)st('cuoci','forno','Cuoci il pane in cassetta',r.lid?'180 °C statico, stampi chiusi col coperchio, 35-40 minuti. Cotto quando la sonda al cuore segna 95-96 °C.':'175 °C statico, stampi aperti, 30-35 minuti. Cotto quando la sonda al cuore segna 95-96 °C.',r.lid?38:33,{timer:true,note:r.lid?'Negli ultimi 5 minuti puoi togliere il coperchio per controllare il colore.':'Se la cupola si colora troppo presto, coprila con un foglio di alluminio.'});
-    else st('cuoci','forno','Cuoci i filoni','175 °C statico, senza vapore, 35-40 minuti. Sono cotti quando la sonda al cuore segna 96-98 °C, o battendo sotto suonano vuoto.',38,{timer:true,note:'Se si colorano troppo presto, abbassa a 165 °C. Più alta è la temperatura, più la crosta diventa dura.'});
+    if(P.cassetta)st('proof','forma','Lievitazione negli stampi','In cella a '+t1(r.finT)+' °C, modalità umida, stampi aperti, per circa '+r.finMin+' minuti. Accendi il forno a '+bk.T+' °C statico 30 minuti prima.',r.finMin,{timer:true,note:r.lid?'Pronto quando l\'impasto arriva a 1 cm dal bordo dello stampo: allora chiudi il coperchio e inforna. Non aspettare di più, o il coperchio schiaccia l\'impasto.':'Pronto quando l\'impasto supera il bordo di 1-2 cm. Spennellalo delicatamente con '+(r.butter?'burro fuso tiepido':'un filo d\'olio')+' (o latte) appena prima di infornare.'});
+    else st('proof','forma','Lievitazione finale','In cella a '+t1(r.finT)+' °C, modalità umida, per circa '+r.finMin+' minuti. Accendi il forno a '+bk.T+' °C statico'+(P.custom?'':' (o 165 °C ventilato)')+' 30 minuti prima.',r.finMin,{timer:true,anim:'poke',note:'Pronti quando sono quasi raddoppiati e l\'impronta del dito torna su piano piano. Per una crosta più morbida e lucida spennellali con un po\' di latte o un filo d\'olio.'});
+    if(P.cassetta)st('cuoci','forno','Cuoci il pane in cassetta',bk.T+' °C statico, stampi '+(r.lid?'chiusi col coperchio':'aperti')+', '+bk.txt+'. Cotto quando la sonda al cuore segna 95-96 °C.',bk.m,{timer:true,note:r.lid?'Negli ultimi 5 minuti puoi togliere il coperchio per controllare il colore.':'Se la cupola si colora troppo presto, coprila con un foglio di alluminio.'});
+    else st('cuoci','forno','Cuoci i filoni',bk.T+' °C statico, senza vapore, '+bk.txt+'. Sono cotti quando la sonda al cuore segna 96-98 °C, o battendo sotto suonano vuoto.',38,{timer:true,note:'Se si colorano troppo presto, abbassa a 165 °C. Più alta è la temperatura, più la crosta diventa dura.'});
     if(P.cassetta)st('telo','forno','Sforma, spennella e fai raffreddare','Togli subito il pane dagli stampi, spennella tutta la superficie con '+(r.butter?'burro fuso':'un filo d\'olio')+' finché è caldo e mettilo su una griglia coperto con un telo: la crosta resta morbida e lucida. Taglialo solo da freddo, dopo almeno un\'ora.',0,{note:'Bastano 20-30 g di '+(r.butter?'burro fuso':'olio')+' per tutti gli stampi.'});
     else st('telo','forno','Copri i filoni con un telo','Appena sfornati coprili con un telo pulito mentre raffreddano: il vapore ammorbidisce la crosta. Non tagliarli prima di 30 minuti.',0);
     const done=ses?ses.done:{},now=Date.now();let t=t0;
@@ -534,6 +553,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   }
 
   /* ---- Blocchi di contenuto ---- */
+  const pc=x=>(Math.round(x*1000)/10).toLocaleString('it-IT')+'%';
   function doseHtmlPane(r){
     const multi=r.N>1,row=(a,b,v,f)=>'<tr><td>'+a+(b?'<small>'+b+'</small>':'')+'</td><td class="v">'+f(v)+'</td>'+(multi?'<td class="v">'+f(v/r.N)+'</td>':'')+'</tr>';
     const PN=r.P.pre==='biga'?'Biga':'Poolish';
@@ -542,8 +562,8 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
       row('Farina','',r.preFl,gr)+row('Acqua',r.P.pre==='biga'?'18-20 °C':'circa 22 °C',r.preAc,gr)+row('Lievito fresco',(Math.round(r.preY*100)/100).toLocaleString('it-IT')+'% sulla farina '+(r.P.pre==='biga'?'della biga':'del poolish'),r.preLv,gr1)+
       '<tr><td colspan="'+(multi?3:2)+'"><b>Impasto finale</b></td></tr>';
     const mk=r.P.milk?r.mainAc*r.P.milk/100:0;
-    h+=row('Farina Rebelde','',r.mainFl,gr)+row('Acqua',Math.round(clamp(r.Tmain,0,60))+' °C la parte principale, '+Math.round(clamp(r.Tres,0,30))+' °C quella tenuta da parte',r.mainAc-mk,gr)+(mk?row('Latte','alla stessa temperatura dell\'acqua',mk,gr):'')+
-      row('Sale','2%',r.sa,gr)+(r.P.cassetta?row('Zucchero',r.P.malto+'%',r.ma,gr):row('Malto o zucchero','1%',r.ma,gr))+(r.butter?row('Burro','7%, morbido',r.ol,gr):row('Olio EVO',(r.fatP||r.P.olio)+'%',r.ol,gr))+row('Lievito fresco',(Math.round(r.P.yMain*100)/100).toLocaleString('it-IT')+'%',r.mainLv,gr1)+'</tbody></table>';
+    h+=row('Farina Rebelde','',r.mainFl,gr)+(r.mainAc-mk>=1?row('Acqua',Math.round(clamp(r.Tmain,0,60))+' °C la parte principale, '+Math.round(clamp(r.Tres,0,30))+' °C quella tenuta da parte',r.mainAc-mk,gr):'')+(mk?row('Latte',r.mainAc-mk>=1?'alla stessa temperatura dell\'acqua':Math.round(clamp(r.Tmain,0,60))+' °C, una parte tenuta da parte a '+Math.round(clamp(r.Tres,0,30))+' °C',mk,gr):'')+
+      (r.uo>0?row('Uova','sbattute',r.uo,gr):'')+row('Sale',pc(r.sa/r.fl),r.sa,gr)+(r.ma>0?(r.P.cassetta||r.P.custom?row('Zucchero',pc(r.ma/r.fl),r.ma,gr):row('Malto o zucchero','1%',r.ma,gr)):'')+(r.bu>0?row('Burro',pc(r.bu/r.fl)+', morbido',r.bu,gr):'')+(r.ol>0?row('Olio EVO',pc(r.ol/r.fl),r.ol,gr):'')+row('Lievito fresco',(Math.round(r.P.yMain*100)/100).toLocaleString('it-IT')+'%',r.mainLv,gr1)+'</tbody></table>';
     h+='<div class="pills"><div class="pill"><b>'+t1(r.total/1000)+' kg</b><span>impasto</span></div><div class="pill"><b>'+r.n+' × '+Math.round(r.g)+'</b><span>'+(r.P.cassetta?'stampi':'filoni')+' × grammi</span></div><div class="pill"><b>'+Math.round(r.idr*100)+'%</b><span>'+(r.P.milk?'acqua e latte':'acqua totale')+'</span></div></div>';
     return h;
   }
@@ -587,7 +607,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
   }
   function laterHtml(r){
     if(r.pane)return '<ul class="rules">'+(r.P.pre?'<li><b>'+(r.P.pre==='biga'?'Biga':'Poolish')+' a '+t1(r.preT)+' °C per '+t1(r.preH)+' ore.</b> Lievito '+(Math.round(r.preY*100)/100).toLocaleString('it-IT')+'% sulla sua farina: più caldo o più ore, meno lievito.</li>':'')+
-      '<li><b>Puntata a '+t1(r.bulkT)+' °C:</b> '+r.bulkMin+' minuti, con un giro di pieghe a metà.</li><li><b>Lievitazione finale a '+t1(r.finT)+' °C</b>, umida: '+r.finMin+' minuti.</li><li><b>Cottura:</b> '+(r.P.cassetta?(r.lid?'180 °C statico, stampo chiuso, 35-40 minuti':'175 °C statico, stampo aperto, 30-35 minuti')+', poi fuori dallo stampo su una griglia.':'175 °C statico, senza vapore, 35-40 minuti, poi sotto un telo.')+'</li></ul>';
+      '<li><b>Puntata a '+t1(r.bulkT)+' °C:</b> '+r.bulkMin+' minuti, con un giro di pieghe a metà.</li><li><b>Lievitazione finale a '+t1(r.finT)+' °C</b>, umida: '+r.finMin+' minuti.</li><li><b>Cottura:</b> '+(()=>{const b=bakeOf(r);return b.T+' °C statico'+(r.P.cassetta?', stampo '+(r.lid?'chiuso':'aperto')+', '+b.txt+', poi fuori dallo stampo su una griglia.':', senza vapore, '+b.txt+', poi sotto un telo.')})()+'</li></ul>';
     return '<ul class="rules"><li><b>Frigo a '+t1(r.fr)+' °C.</b> '+(r.fr>6?'È caldo per una maturazione lunga: il lievito è ridotto, ma controlla l\'impasto più spesso.':r.fr<2?'Molto freddo: l\'impasto rischia di fermarsi, il lievito è aumentato.':'Il lievito è calcolato su questa temperatura.')+'</li>'+
       '<li><b>Fuori dal frigo a '+t1(r.r2)+' °C:</b> '+hmin(r.outMin)+' prima di stendere.</li>'+
       '<li><b>In teglia a '+t1(r.pT)+' °C:</b> '+r.proofMin+' minuti di lievitazione.</li></ul>';
@@ -605,7 +625,7 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     return {txt:'In frigo circa <b>'+Math.round(r.hoursY)+' ore</b>, da '+fmtT(r.fiPred)+' a '+fmtT(r.out)+'. Lievito: <b>'+gr1(r.lv)+'</b>.'};
   }
   function rulesHtml(r){
-    if(r.pane)return '<ul class="rules"><li><b>'+r.mx.name+'.</b> '+r.mx.rule+'</li><li><b>Crosta morbida.</b> Cottura bassa (175 °C), niente vapore, malto per il colore, olio nell\'impasto e telo appena sfornato.</li><li><b>Pesa ogni pezzo:</b> '+gr(r.g)+(r.P.cassetta?' a stampo: con troppo impasto il coperchio non chiude, con poco gli angoli restano vuoti.':' a filone, così cuociono tutti uguali.')+'</li></ul>';
+    if(r.pane)return '<ul class="rules"><li><b>'+r.mx.name+'.</b> '+r.mx.rule+'</li>'+(r.P.custom?'<li><b>Ricetta tua.</b> Dosi lette dal testo che hai incollato e riportate alla quantità che vuoi.</li>':r.P.cassetta?'<li><b>Mollica tenera.</b> Latte, zucchero e '+(r.bu>0?'burro al '+pc(r.bu/r.fl):'olio')+'; spennellato appena sfornato.</li>':'<li><b>Crosta morbida.</b> Cottura bassa (175 °C), niente vapore, malto per il colore, olio nell\'impasto e telo appena sfornato.</li>')+'<li><b>Pesa ogni pezzo:</b> '+gr(r.g)+(r.P.cassetta?' a stampo: con troppo impasto il coperchio non chiude, con poco gli angoli restano vuoti.':' a filone, così cuociono tutti uguali.')+'</li></ul>';
     return '<ul class="rules"><li><b>'+r.mx.name+'.</b> '+r.mx.rule+'</li>'+
       '<li><b>'+r.P.name+'.</b> Acqua '+Math.round(r.idr*100)+'%, olio '+r.P.olio+'%, circa '+gr(r.g)+' a teglia.</li>'+
       '<li><b>Lievito '+(Math.round(r.yPct*100)/100).toLocaleString('it-IT')+'%.</b> Calcolato su circa '+Math.round(r.hoursY)+' ore di frigo a '+t1(r.fr)+' °C e impasto a '+t1(r.tgt)+' °C. Più ore o frigo più caldo: meno lievito.</li>'+
@@ -859,10 +879,11 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     {html:()=>'<canvas id="art" class="art" aria-hidden="true"></canvas><div class="lbl">Con la farina del tuo grano Rebelde</div><h1>Cosa prepari?</h1>'+
       '<label>Prodotto<select data-k="prod" data-rr>'+
       '<optgroup label="Pizza">'+Object.keys(PRODUCTS).filter(k=>!isPane(k)).map(k=>'<option value="'+k+'"'+(S.prod===k?' selected':'')+'>'+PRODUCTS[k].name+'</option>').join('')+'</optgroup>'+
-      '<optgroup label="Pane">'+Object.keys(PRODUCTS).filter(isPane).map(k=>'<option value="'+k+'"'+(S.prod===k?' selected':'')+'>'+PRODUCTS[k].name+'</option>').join('')+'</optgroup>'+
+      '<optgroup label="Pane">'+Object.keys(PRODUCTS).filter(k=>isPane(k)&&!PRODUCTS[k].custom).map(k=>'<option value="'+k+'"'+(S.prod===k?' selected':'')+'>'+PRODUCTS[k].name+'</option>').join('')+'</optgroup>'+
+      '<optgroup label="Le mie ricette">'+MINE.map(p=>'<option value="'+p.key+'"'+(S.prod===p.key?' selected':'')+'>'+esc(p.name)+'</option>').join('')+'<option value="__imp">+ Incolla una ricetta da un sito…</option></optgroup>'+
       SOON.map(g=>'<optgroup label="'+g[0]+'">'+g[1].map(n=>'<option disabled>'+n+' (in arrivo)</option>').join('')+'</optgroup>').join('')+
-      '</select></label><p class="msg">'+PRODUCTS[S.prod].d+'</p>',der:()=>''},
-    {html:r=>r.pane?'<h1>'+(r.P.cassetta?'Quanti stampi?':'Quanti filoni?')+'</h1>'+(r.P.cassetta?'<div class="chips"><button type="button" class="chip'+(S.fat!=='olio'?' on':'')+'" data-fat="burro"><b>Burro</b><span>Classico: mollica fine, profumo di pancarrè</span></button><button type="button" class="chip'+(S.fat==='olio'?' on':'')+'" data-fat="olio"><b>Olio</b><span>Più leggero, sapore neutro</span></button></div>'+
+      '</select></label><p class="msg">'+esc(PRODUCTS[S.prod].d)+'</p>'+(PRODUCTS[S.prod].custom?'<div class="actions"><button type="button" class="btn ghost small" data-act="impedit">Modifica ricetta</button><button type="button" class="btn ghost small danger" data-act="impdel">'+(confirmEnd?'Conferma eliminazione':'Elimina ricetta')+'</button></div>':''),der:()=>''},
+    {html:r=>r.pane?'<h1>'+(r.P.cassetta?'Quanti stampi?':'Quanti filoni?')+'</h1>'+(r.P.cassetta?(r.P.custom?'':'<div class="chips"><button type="button" class="chip'+(S.fat!=='olio'?' on':'')+'" data-fat="burro"><b>Burro</b><span>Ricco: mollica fine, profumo di pancarrè</span></button><button type="button" class="chip'+(S.fat==='olio'?' on':'')+'" data-fat="olio"><b>Olio</b><span>Più leggero, sapore neutro</span></button></div>')+
       '<div class="chips"><button type="button" class="chip'+(S.lid!=='aperto'?' on':'')+'" data-lid="chiuso"><b>Stampo chiuso</b><span>Con coperchio: fette quadrate, crosta sottile</span></button><button type="button" class="chip'+(S.lid==='aperto'?' on':'')+'" data-lid="aperto"><b>Stampo aperto</b><span>Senza coperchio: cupola dorata sopra</span></button></div>':'')+'<div class="grid">'+fld(r.P.cassetta?'Numero di stampi':'Numero di filoni','n',S.n,'min="1" max="100" step="1" inputmode="numeric"')+fld(r.P.cassetta?'Impasto per stampo (g)':'Peso a filone (g)','g',S.g,'min="100" step="10" inputmode="numeric"',r.P.g)+fld('Acqua (% sulla farina)','idr',S.idr,'min="55" max="78" step="1" inputmode="numeric"',r.P.idr)+'</div><div id="der" class="stack"></div>':
       '<h1>Quanta ne fai?</h1><div class="grid">'+fld('Numero di teglie','n',S.n,'min="1" max="60" step="1" inputmode="numeric"')+
       '<label>Formato teglia<select data-k="fmt" data-rr><option value="60"'+(S.fmt==='60'?' selected':'')+'>60×40 cm</option><option value="46"'+(S.fmt==='46'?' selected':'')+'>46×33 cm</option><option value="altro"'+(S.fmt==='altro'?' selected':'')+'>Altro</option></select></label>'+
@@ -1054,6 +1075,86 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     fr.readAsText(file);
   }
 
+  /* ---- Lettura di una ricetta incollata: regole su parole e unità, niente rete neurale ---- */
+  const ING=[
+    ['lievito',/lievito|\bldb\b/],['farina',/farin|manitoba|semola|\btipo\s*0|\b00\b/],['latte',/\blatte\b/],['acqua',/\bacqua\b/],
+    ['burro',/burro|margarina|strutto/],['olio',/\bolio\b/],['zucchero',/zucchero|miele|\bmalto\b/],['sale',/\bsale\b/],['uova',/\buov[ao]|tuorl|album/]];
+  const SPOON={sale:[5,15],zucchero:[4,12],olio:[4,10],burro:[5,12],lievito:[3,9],acqua:[5,15],latte:[5,15],farina:[3,9],uova:[5,15]};
+  function parseRecipe(txt){
+    const out={farina:0,acqua:0,latte:0,burro:0,olio:0,zucchero:0,sale:0,lievito:0,uova:0,notes:[],found:[]};
+    const lines=String(txt||'').replace(/\r/g,'').split(/\n|;|•/).map(l=>l.trim()).filter(Boolean);
+    const nameL=lines.find(l=>!/\d/.test(l)&&l.length>2&&l.length<60&&!ING.some(i=>i[1].test(l.toLowerCase())));
+    out.name=nameL?nameL.replace(/^ricetta[:\s]*/i,'').replace(/[:.]+$/,''):'';
+    let secco=false,madre=false;
+    lines.forEach(L=>{
+      const l=L.toLowerCase().replace(/(\d),(\d)/g,'$1.$2').replace(/½/g,'0.5').replace(/¼/g,'0.25');
+      if(/pasta madre|lievito madre|li\.?co\.?li|licoli/.test(l)){madre=true;return}
+      const ing=ING.find(i=>i[1].test(l));if(!ing)return;
+      const k=ing[0];
+      if(/q\.?\s*b\.?|quanto basta|per (spolverare|ungere|spennellare)|per la superficie/.test(l)&&!/\d/.test(l))return;
+      if(k==='farina'&&/per (spolverare|il piano|la spianatoia)/.test(l))return;
+      const m=l.match(/(\d+(?:\.\d+)?)\s*(kg|gr?\b|grammi?|ml|cl|dl|litri?|l\b|cucchiain[oi]|cucchia[io]+|bustin[ae]|cubett[oi]|panett[oi])?/);
+      if(!m)return;
+      let v=+m[1],u=(m[2]||'').replace(/\s/g,''),g=null;
+      if(/^kg/.test(u))g=v*1000;else if(/^g/.test(u))g=v;else if(u==='ml')g=v*(k==='olio'?0.92:1);else if(u==='cl')g=v*10;else if(u==='dl')g=v*100;else if(/^l/.test(u))g=v*1000;
+      else if(/^cucchiain/.test(u))g=v*(SPOON[k]||[5])[0];else if(/^cucchia/.test(u))g=v*(SPOON[k]||[5,15])[1];
+      else if(/^bustin/.test(u)){g=k==='lievito'?v*7:v*16;if(k==='lievito')secco=true}
+      else if(/^(cubett|panett)/.test(u))g=v*25;
+      else if(k==='uova')g=v*(/tuorl/.test(l)?18:/album/.test(l)?32:50);
+      else g=v;
+      if(k==='lievito'&&/secco|disidratat|liofilizzat|istantane|di birra secco/.test(l))secco=true;
+      if(k==='lievito'&&/chimico|per dolci|baking/.test(l)){out.notes.push('Ho ignorato il lievito chimico: non serve per un lievitato.');return}
+      out[k]+=g;out.found.push(L);
+    });
+    if(secco&&out.lievito){out.notes.push('Lievito secco: l\'ho convertito in fresco (×3).');out.lievito*=3}
+    if(madre)out.notes.push('La ricetta usa la pasta madre: qui si usa solo lievito di birra fresco, che ho messo all\'1% se non era già indicato.');
+    if(!out.lievito&&out.farina)out.lievito=out.farina*0.01;
+    const all=out.found.length?txt.toLowerCase().replace(/(\d),(\d)/g,'$1.$2'):'';
+    const tMatch=[...all.matchAll(/(\d{3})\s*(?:°|gradi|º)/g)].map(x=>+x[1]).filter(x=>x>=140&&x<=260);
+    out.bakeT=tMatch.length?tMatch[0]:'';
+    const sent=all.split(/[.\n]/);
+    const minsOf=x=>{const h=x.match(/(\d+(?:\.\d+)?)\s*(?:-|–|o|\/|a)?\s*(\d+(?:\.\d+)?)?\s*(?:ore|ora|h)\b/),mm=x.match(/(\d+)\s*(?:-|–|o|\/|a)?\s*(\d+)?\s*(?:minuti|min)\b/);
+      let t=0;if(h)t+=60*(h[2]?(+h[1]+ +h[2])/2:+h[1]);if(mm)t+=mm[2]?(+mm[1]+ +mm[2])/2:+mm[1];return t};
+    const bakeS=sent.find(x=>/cuoc|inforn|forno/.test(x)&&minsOf(x)>0&&!/lievit|riposa/.test(x));
+    out.bakeM=bakeS?Math.round(minsOf(bakeS)):'';
+    const rise=sent.filter(x=>/lievit|riposa|raddopp|puntata|appretto/.test(x)&&!/lievito/.test(x.replace(/lievitar|lievitazion|lievitat/g,''))&&minsOf(x)>0).map(minsOf);
+    out.bulk=rise[0]?Math.round(rise[0]):'';out.fin=rise[1]?Math.round(rise[1]):'';
+    out.shape=/stampo|cassetta|pancarr|plum.?cake/.test(all)?'stampo':'filone';
+    const r1=x=>Math.round(x);['farina','acqua','latte','burro','olio','zucchero','sale','lievito','uova'].forEach(k=>out[k]=r1(out[k]));
+    return out;
+  }
+  function recipeFromImp(I){
+    const F=+I.farina||0,liq=(+I.acqua||0)+(+I.latte||0),tot=F+liq+(+I.burro||0)+(+I.olio||0)+(+I.zucchero||0)+(+I.sale||0)+(+I.lievito||0)+(+I.uova||0);
+    const p=x=>Math.round((+x||0)/F*1000)/10,st=I.shape==='stampo';
+    return {key:I.key||('mia-'+Date.now()),type:'pane',custom:true,cassetta:st,name:(I.name||'La mia ricetta').slice(0,60),
+      d:'Ricetta tua, letta dal testo incollato. Circa '+Math.round(tot)+' g di impasto nella ricetta originale.',
+      idr:Math.round(liq/F*100),milk:liq?Math.round((+I.latte||0)/liq*100):0,olio:p(I.olio),burro:p(I.burro),malto:p(I.zucchero),sale:p(I.sale)||2,uova:p(I.uova),
+      tgt:26,yMain:Math.max(0.1,p(I.lievito)),bulk:+I.bulk||90,fin:+I.fin||60,g:+I.g||(tot&&tot<=1200?Math.round(tot/10)*10:st?950:450),
+      bakeT:+I.bakeT||(st?185:180),bakeM:+I.bakeM||35,w:{},src:String(I.src||'').slice(0,4000)};
+  }
+  let IMP=null;
+  function impSum(){
+    const I=IMP,F=+I.farina||0;if(!F)return '';
+    const q=k=>(Math.round((+I[k]||0)/F*1000)/10).toLocaleString('it-IT')+'%',liq=(+I.acqua||0)+(+I.latte||0);
+    const L=[['Liquidi',(Math.round(liq/F*1000)/10).toLocaleString('it-IT')+'%']].concat([['Uova','uova'],['Burro','burro'],['Olio','olio'],['Zucchero','zucchero'],['Sale','sale'],['Lievito','lievito']].filter(x=>+I[x[1]]>0).map(x=>[x[0],q(x[1])]));
+    return '<p class="sub">Sulla farina: '+L.map(x=>x[0]+' <b>'+x[1]+'</b>').join(' · ')+'</p>';
+  }
+  function impHtml(){
+    if(!IMP||!IMP.read)return '<h1>Incolla una ricetta</h1><p class="sub">Copia da un sito la lista degli ingredienti e, se vuoi, il procedimento. L\'app riconosce farina, acqua, latte, uova, burro, olio, zucchero, sale e lievito, con grammi, ml, cucchiai o bustine, più temperatura e tempi del forno. Poi controlli tu i numeri.</p>'+
+      '<textarea id="impT" rows="12" placeholder="Es.&#10;Pan brioche&#10;500 g farina manitoba&#10;250 ml latte&#10;2 uova&#10;80 g burro&#10;60 g zucchero&#10;8 g sale&#10;12 g lievito di birra fresco&#10;Cuocere a 180° per 30 minuti">'+esc(IMP&&IMP.src||'')+'</textarea>';
+    const I=IMP,F=+I.farina||0;
+    const f=(lab,k,ph)=>'<label>'+lab+'<input type="number" data-imp="'+k+'" value="'+(I[k]===''||I[k]==null?'':I[k])+'" inputmode="decimal"'+(ph!=null?' placeholder="'+ph+'"':'')+'></label>';
+    const liq=(+I.acqua||0)+(+I.latte||0);
+    return '<h1>Controlla la ricetta</h1>'+(F?'':'<p class="msg bad">Non ho trovato la farina: scrivila tu in grammi.</p>')+
+      (I.notes&&I.notes.length?'<p class="msg">'+I.notes.map(esc).join('<br>')+'</p>':'')+
+      '<label>Nome<input type="text" data-imp="name" value="'+esc(I.name||'')+'" class="tin"></label>'+
+      '<div class="chips"><button type="button" class="chip'+(I.shape!=='stampo'?' on':'')+'" data-impshape="filone"><b>Filoni o pezzi</b><span>Cotti in teglia</span></button><button type="button" class="chip'+(I.shape==='stampo'?' on':'')+'" data-impshape="stampo"><b>Stampi</b><span>Cassetta, plumcake</span></button></div>'+
+      '<h3 class="grp">Ingredienti (g)</h3><div class="grid">'+f('Farina','farina')+f('Acqua','acqua')+f('Latte','latte')+f('Uova','uova')+f('Burro','burro')+f('Olio','olio')+f('Zucchero o miele','zucchero')+f('Sale','sale')+f('Lievito fresco','lievito')+'</div>'+
+      '<div id="impsum">'+impSum()+'</div>'+
+      '<h3 class="grp">Tempi e forno</h3><div class="grid">'+f('Puntata (minuti)','bulk',90)+f('Lievitazione finale (minuti)','fin',60)+f('Forno (°C)','bakeT',I.shape==='stampo'?185:180)+f('Cottura (minuti)','bakeM',35)+f(I.shape==='stampo'?'Impasto per stampo (g)':'Peso a pezzo (g)','g',recipeFromImp(Object.assign({},I,{g:''})).g)+'</div>'+
+      '<p class="sub">I campi vuoti usano il valore scritto in grigio. Le dosi vengono riportate alla quantità che sceglierai, sulla tua farina.</p>';
+  }
+
   function render(){
     const top=$('top'),v=$('view'),bar=$('bar');
     if(!SES&&screen!=='wiz'){
@@ -1071,6 +1172,11 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
         v.innerHTML=histItemHtml(HIST[histSel]);
         bar.innerHTML='<button type="button" class="btn ghost" data-act="hist">Indietro</button><button type="button" class="btn ghost danger" data-act="hdel">'+(confirmEnd?'Conferma eliminazione':'Elimina')+'</button>';
         fillPhotos();lastSig='hitem';return;
+      }
+      if(screen==='imp'){
+        v.innerHTML=impHtml();
+        bar.innerHTML='<button type="button" class="btn ghost" data-act="'+(IMP&&IMP.read?'impback':'impcancel')+'">Indietro</button>'+(IMP&&IMP.read?'<button type="button" class="btn big" data-act="impsave"'+(+IMP.farina>0?'':' disabled')+'>Salva ricetta</button>':'<button type="button" class="btn big" data-act="impread">Leggi la ricetta</button>');
+        lastSig='imp';return;
       }
       if(screen==='places'){
         v.innerHTML='<h1>Posti e temperature</h1><p class="sub">I posti dove tieni l\'impasto, con la temperatura tipica. "Freddo" vale per frigo e cella.</p><div class="stack">'+
@@ -1180,11 +1286,23 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     const a=t.dataset.act;
     if(t.dataset.open){SES=ALL[+t.dataset.open]||null;view='now';confirmEnd=false;render();$('view').scrollTop=0;return}
     if(t.dataset.fat){S.fat=t.dataset.fat;saveS();render();return}
+    if(t.dataset.impshape&&IMP){IMP.shape=t.dataset.impshape;render();return}
     if(t.dataset.lid){S.lid=t.dataset.lid;saveS();render();return}
     if(t.dataset.mixer){S.mixer=t.dataset.mixer;S.cap=MIXERS[S.mixer].cap;S.fric='';saveS();render();return}
     if(t.dataset.tab){sumTab=t.dataset.tab;confirmEnd=false;render();$('view').scrollTop=0;return}
     if(t.dataset.toggle){const id=t.dataset.toggle;if(SES.done[id])delete SES.done[id];else SES.done[id]=Date.now();saveSes();render();return}
     if(a!=='abort')confirmAbort=false;
+    if(a==='impread'){const T=$('impT'),src=T?T.value:'';if(!src.trim())return;IMP=Object.assign(parseRecipe(src),{src:src,read:true,g:''});render();$('view').scrollTop=0;return}
+    if(a==='impback'){IMP.read=false;render();return}
+    if(a==='impcancel'){IMP=null;screen='wiz';wiz=0;if(!PRODUCTS[S.prod]||S.prod==='__imp')S.prod='pane-diretto';render();return}
+    if(a==='impsave'){const p=recipeFromImp(IMP),i=MINE.findIndex(x=>x.key===p.key);if(i>=0)MINE[i]=p;else MINE.push(p);saveMine();PANE[p.key]=p;PRODUCTS[p.key]=p;
+      S.prod=p.key;S.g='';S.idr='';S.n=p.cassetta?2:4;saveS();IMP=null;screen='wiz';wiz=0;render();$('view').scrollTop=0;return}
+    if(a==='impedit'){const p=PRODUCTS[S.prod];if(!p||!p.custom)return;const F=1000;
+      IMP={key:p.key,read:true,src:p.src||'',name:p.name,shape:p.cassetta?'stampo':'filone',farina:F,acqua:Math.round(F*p.idr/100*(1-p.milk/100)),latte:Math.round(F*p.idr/100*p.milk/100),
+        uova:Math.round(F*p.uova/100),burro:Math.round(F*p.burro/100),olio:Math.round(F*p.olio/100),zucchero:Math.round(F*p.malto/100),sale:Math.round(F*p.sale/100),lievito:Math.round(F*p.yMain/100),
+        bulk:p.bulk,fin:p.fin,bakeT:p.bakeT,bakeM:p.bakeM,g:p.g,notes:['Dosi riportate a 1 kg di farina.']};screen='imp';render();$('view').scrollTop=0;return}
+    if(a==='impdel'){if(!confirmEnd){confirmEnd=true;render();return}confirmEnd=false;const k=S.prod;MINE=MINE.filter(x=>x.key!==k);saveMine();
+      if(!ALL.some(x=>x.inp.prod===k)&&!HIST.some(x=>x.inp&&x.inp.prod===k)){delete PANE[k];delete PRODUCTS[k]}S.prod='pane-diretto';saveS();render();return}
     if(a==='home'){SES=null;screen='home';bkMsg='';view='now';confirmEnd=false;releaseAwake();render();$('view').scrollTop=0}
     else if(a==='new'){screen='wiz';wiz=0;fixDates();render();$('view').scrollTop=0}
     else if(a==='next'){wiz=Math.min(WZ.length-1,wiz+1);render();$('view').scrollTop=0}
@@ -1252,10 +1370,14 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
     const el=e.target;
     if(el.dataset.k&&!SES){
       const k=el.dataset.k;
+      if(k==='prod'&&el.value==='__imp'){IMP=null;screen='imp';render();$('view').scrollTop=0;return}
       S[k]=el.type==='number'?(el.value===''?'':parseFloat(el.value)):el.value;
       if(k==='prod'||k==='fmt'){S.g='';if(k==='prod'){S.idr='';S.preT='';S.preH='';if(isPane(S.prod)&&(+S.n||0)>40)S.n=10;if(S.prod==='pane-cassetta'&&(+S.n||0)>6)S.n=4}}
       saveS();
       if(el.dataset.rr!==undefined)render();else{derived();if(k==='bake'||k==='start'){const b=document.querySelector('[data-act=start]');if(b)b.disabled=!!timeMsg(compute(S,startMs()),startMs()).block}}
+    }else if(el.dataset.imp&&IMP){
+      const k=el.dataset.imp;IMP[k]=el.type==='number'?(el.value===''?'':parseFloat(el.value)):el.value;
+      const sm=$('impsum');if(sm)sm.innerHTML=impSum();const b=document.querySelector('[data-act=impsave]');if(b)b.disabled=!(+IMP.farina>0);
     }else if(el.dataset.com&&SES){
       const k=el.dataset.com;SES.j=SES.j||{};SES.j[k]=SES.j[k]||{};SES.j[k].com=el.value;saveSes();
     }else if(el.dataset.pl){
